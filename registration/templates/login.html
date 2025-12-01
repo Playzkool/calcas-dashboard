@@ -7,6 +7,10 @@
             <label class='label required' for='email'>Email</label>
             <input type="email" pattern="^[^`~!#$%^&*()={}\[\]|\\:;“’<,>?๐฿]*$" id="email" name="email" tabindex="1" maxlength="80" class="textInput" title="Entrez votre email" required value="{% if not form.errors and request.COOKIES.email %}{{ request.COOKIES.email.strip }}{% endif %}"/>
         </li>
+        <li class="form-list__row" style="position:relative; margin-top: 50px">
+            {{ form.password.label_tag }}
+            {{ form.password }}
+        </li>
     </ul>
 
     <div  style="text-align: center; color:#c44f4f">
