@@ -24,7 +24,7 @@ class Pupil(models.Model):
     creation_source = models.PositiveSmallIntegerField(choices=registration_enums.Grade,
                                                        default=registration_enums.Grade.PS,
                                                        verbose_name="Source de création")
-    grade = models.Choice(choices=Grade.choices, verbose_name="Grade", default=Grade.PS)
+    grade = models.PositiveIntegerField(choices=Grade.choices, verbose_name="Grade", default=Grade.PS)
 
     class Meta:
         app_label = "registration"
