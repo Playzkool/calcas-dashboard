@@ -50,6 +50,10 @@ class RegistrationFile(models.Model):
 
 
 
+# TODO Join tables
+
+
+
 
 
 
