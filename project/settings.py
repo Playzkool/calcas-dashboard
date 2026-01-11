@@ -85,7 +85,7 @@ DATABASES = {
 }
 
 # Login
-LOGIN_URL = reverse_lazy("registration:connexion")
+LOGIN_URL = 'accounts/login'
 LOGIN_REDIRECT_URL = reverse_lazy("registration:home")
 
 

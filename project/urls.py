@@ -19,6 +19,7 @@ from django.contrib import admin
 
 urlpatterns = [
     path('', include("registration.urls", namespace='registration')),
+    path('accounts/', include('django.contrib.auth.urls')),
     path('admin/', admin.site.urls),
 
 ]
