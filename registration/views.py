@@ -36,7 +36,6 @@ class DashboardViewHome(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, *args, **kwargs):
         context = super(DashboardViewHome, self).get_context_data(*args, **kwargs)
-        context['test_value'] = 'toto le robot'
         context['api_url'] = settings.API_URL
         return context
 
