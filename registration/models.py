@@ -21,10 +21,8 @@ class LegalRepresentative(models.Model):
 class Pupil(models.Model):
     firstname = models.CharField(max_length=100, verbose_name="Prénom")
     lastname = models.CharField(max_length=100, verbose_name="Nom")
-    creation_source = models.PositiveSmallIntegerField(choices=registration_enums.Grade,
-                                                       default=registration_enums.Grade.PS,
-                                                       verbose_name="Source de création")
-    grade = models.PositiveIntegerField(choices=Grade.choices, verbose_name="Grade", default=Grade.PS)
+    birth_date = models.DateField(verbose_name="Date de naissance")
+    grade = models.PositiveIntegerField(choices=Grade.choices, default=registration_enums.Grade.PS, verbose_name="Grade")
 
     class Meta:
         app_label = "registration"
@@ -32,7 +30,7 @@ class Pupil(models.Model):
         verbose_name_plural = "Élèves"
 
 
-
+# Person in charge for managing registration campaigns
 class RegistrationSupervisor(models.Model):
     user = models.OneToOneField(User, verbose_name="User", on_delete=models.CASCADE)
     firstname = models.CharField(max_length=100, verbose_name="Prénom")
@@ -44,13 +42,39 @@ class RegistrationSupervisor(models.Model):
         verbose_name_plural = "Gestionnaires des inscriptions"
 
 
+class RegistrationCampaign(models.Model):
+    year = models.DateField(verbose_name="Année scolaire", null=False, blank=False)
+
+    class Meta:
+        app_label = "registration"
+        verbose_name = "Année scolaire"
+        verbose_name_plural = "Années scolaires"
+
 
 class RegistrationFile(models.Model):
+    campaign = models.ForeignKey(RegistrationCampaign, verbose_name="Campaign", on_delete=models.CASCADE)
     parameters = models.JSONField(verbose_name="Parametres", default=dict, editable=True, blank=True)
+    # TODO file fields ?
+    pupil = models.ForeignKey(Pupil, verbose_name="Pupil", on_delete=models.CASCADE)
+
+    class Meta:
+        app_label = "registration"
+        verbose_name = "Dossier d'inscription"
+        verbose_name_plural = "Dossiers d'inscriptions"
 
 
 
-# TODO Join tables
+class PupilLegalRepresentative(models.Model):
+    pupil = models.ForeignKey(Pupil, verbose_name="Pupil", on_delete=models.CASCADE)
+    legal_representative = models.ForeignKey(LegalRepresentative, verbose_name="Representative", on_delete=models.CASCADE)
+    # TODO lien de parenté ?
+
+    class Meta:
+        app_label = "registration"
+        verbose_name = "Lien de parenté"
+        verbose_name_plural = "Liens de parentés"
+
+
 
 
 
