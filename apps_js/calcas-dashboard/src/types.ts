@@ -11,3 +11,4 @@ export const RegistrationFormSchema = z.object({
 })
 
 export type RegistrationFormType = z.infer<typeof RegistrationFormSchema>
+export type RegistrationFormInputType = z.input<typeof RegistrationFormSchema>

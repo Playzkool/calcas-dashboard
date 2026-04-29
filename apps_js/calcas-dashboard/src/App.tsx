@@ -1,37 +1,32 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import {RegistrationForm} from "./components/registration-form.tsx";
+import { useMemo, useState } from "react";
+import { createTheme, CssBaseline, ThemeProvider } from "@mui/material";
+import { Layout, type Page } from "./components/layout";
+import { RegistrationForm } from "./components/registration-form";
+
+const PAGES: Record<Page, React.ReactNode> = {
+    registration: <RegistrationForm />,
+};
 
 function App() {
-  const [count, setCount] = useState(0)
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const [mode, setMode] = useState<"light" | "dark">(prefersDark ? "dark" : "light");
+    const [page, setPage] = useState<Page>("registration");
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-        <RegistrationForm />
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    const theme = useMemo(() => createTheme({ palette: { mode } }), [mode]);
+
+    return (
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <Layout
+                mode={mode}
+                onToggleMode={() => setMode((m) => (m === "light" ? "dark" : "light"))}
+                page={page}
+                onNavigate={setPage}
+            >
+                {PAGES[page]}
+            </Layout>
+        </ThemeProvider>
+    );
 }
 
-export default App
+export default App;
