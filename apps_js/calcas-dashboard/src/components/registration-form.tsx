@@ -19,22 +19,15 @@ import { useAppDispatch, useAppSelector } from "../hooks";
 import { resetRegistration, submitRegistration } from "../store/registration-slice";
 
 const GRADES: { label: string; value: number }[] = [
-    { label: "CP", value: 1 },
-    { label: "CE1", value: 2 },
-    { label: "CE2", value: 3 },
-    { label: "CM1", value: 4 },
-    { label: "CM2", value: 5 },
-    { label: "6ème", value: 6 },
-    { label: "5ème", value: 7 },
-    { label: "4ème", value: 8 },
-    { label: "3ème", value: 9 },
+    { label: "Petite section", value: 1 },
+    { label: "Moyenne section", value: 2 },
+    { label: "Grande section", value: 3 },
+    { label: "CP", value: 4 },
+    { label: "CE1", value: 5 },
+    { label: "CE2", value: 6 },
+    { label: "CM1", value: 7 },
+    { label: "CM2", value: 8 },
 ];
-
-const currentYear = new Date().getFullYear();
-const CAMPAIGNS = Array.from({ length: 5 }, (_, i) => ({
-    label: `${currentYear - 1 + i} – ${currentYear + i}`,
-    value: currentYear - 1 + i,
-}));
 
 const defaultValues = {
     firstname: "",
@@ -134,27 +127,7 @@ export function RegistrationForm() {
                         )}
                     />
 
-                    <Controller
-                        control={control}
-                        name="campaign"
-                        render={({ field }) => (
-                            <FormControl error={!!errors.campaign}>
-                                <InputLabel>Année scolaire</InputLabel>
-                                <Select label="Année scolaire" {...field} value={field.value ?? ""}>
-                                    {CAMPAIGNS.map((c) => (
-                                        <MenuItem key={c.value} value={c.value}>
-                                            {c.label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                {errors.campaign && (
-                                    <FormHelperText>{errors.campaign.message}</FormHelperText>
-                                )}
-                            </FormControl>
-                        )}
-                    />
-
-                    <Controller
+<Controller
                         control={control}
                         name="document"
                         render={({ field: { onChange, value, ref } }) => (

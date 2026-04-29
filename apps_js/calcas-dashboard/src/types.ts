@@ -5,8 +5,7 @@ export const RegistrationFormSchema = z.object({
     lastname: z.string(),
     birth_date: z.coerce.date(),
     grade: z.number(),
-    campaign: z.number(), // année scolaire
-    document: z.file().mime('application/pdf') // TODO rename the document
+document: z.file().mime('application/pdf') // TODO rename the document
 
 })
 
