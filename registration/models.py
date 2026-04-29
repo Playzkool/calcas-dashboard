@@ -54,8 +54,8 @@ class RegistrationCampaign(models.Model):
 class RegistrationFile(models.Model):
     campaign = models.ForeignKey(RegistrationCampaign, verbose_name="Campaign", on_delete=models.CASCADE)
     parameters = models.JSONField(verbose_name="Parametres", default=dict, editable=True, blank=True)
-    # TODO file fields ?
     pupil = models.ForeignKey(Pupil, verbose_name="Pupil", on_delete=models.CASCADE)
+    document = models.FileField(upload_to="registration_documents/", verbose_name="Document", null=True, blank=True)
 
     class Meta:
         app_label = "registration"
