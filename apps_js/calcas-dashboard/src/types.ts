@@ -1,5 +1,12 @@
 import * as z from 'zod'
 
+export type UserRole = 'legal_representative' | 'registration_supervisor'
+
+export interface AuthUser {
+    username: string
+    role: UserRole
+}
+
 export const RegistrationFormSchema = z.object({
     firstname: z.string(),
     lastname: z.string(),

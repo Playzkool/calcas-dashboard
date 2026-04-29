@@ -1,8 +1,10 @@
 from django.urls import path
 
-from rest_api.views import UserInfosView, RegistrationFileCreateView
+from rest_api.views import LoginView, LogoutView, MeView, RegistrationsView
 
 urlpatterns = [
-    path('user-infos/', UserInfosView.as_view()),
-    path('registrations/', RegistrationFileCreateView.as_view()),
+    path("login/", LoginView.as_view()),
+    path("logout/", LogoutView.as_view()),
+    path("me/", MeView.as_view()),
+    path("registrations/", RegistrationsView.as_view()),
 ]
