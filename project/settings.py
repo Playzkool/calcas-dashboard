@@ -87,8 +87,12 @@ DATABASES = {
 }
 
 # Login
-LOGIN_URL = 'accounts/login'
-LOGIN_REDIRECT_URL = reverse_lazy("registration:home")
+LOGIN_URL = '/'
+LOGIN_REDIRECT_URL = '/'
+
+# Email — use console backend in dev; replace with SMTP config in production
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'no-reply@calcas-dashboard.local'
 
 
 # Password validation

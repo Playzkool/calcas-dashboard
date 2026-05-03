@@ -6,6 +6,7 @@ import {
     Card,
     CardContent,
     CircularProgress,
+    Link,
     Stack,
     TextField,
 } from "@mui/material";
@@ -59,6 +60,13 @@ export function LoginPage() {
                             >
                                 {status === "loading" ? "Connexion…" : "Se connecter"}
                             </Button>
+                            <Link
+                                href="/accounts/password_reset/"
+                                variant="body2"
+                                sx={{ textAlign: "center" }}
+                            >
+                                Mot de passe oublié ?
+                            </Link>
                         </Stack>
                     </form>
                 </CardContent>

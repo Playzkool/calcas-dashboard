@@ -19,9 +19,18 @@ export default defineConfig(({ mode }) =>  {
           },
         },
         build: {
-            assetsDir: '', // Does not create assets folders but puts all builds files in one place
+            outDir: '../../registration/static/registration-react',
+            emptyOutDir: true,
+            assetsDir: '',
+            rollupOptions: {
+                output: {
+                    entryFileNames: 'index.js',
+                    chunkFileNames: '[name].js',
+                    assetFileNames: '[name].[ext]',
+                },
+            },
         },
-        base: isProduction ? '/static/registration-react' : '',
+        base: isProduction ? '/static/registration-react/' : '/',
     }
 
 })
