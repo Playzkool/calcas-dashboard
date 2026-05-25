@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -73,6 +74,15 @@ class PupilLegalRepresentative(models.Model):
         app_label = "registration"
         verbose_name = "Lien de parenté"
         verbose_name_plural = "Liens de parentés"
+        constraints = [
+            models.UniqueConstraint(fields=["pupil", "legal_representative"], name="unique_pupil_legal_representative"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            if PupilLegalRepresentative.objects.filter(pupil=self.pupil).count() >= 2:
+                raise ValidationError("Un élève ne peut avoir que deux représentants légaux au maximum.")
+        super().save(*args, **kwargs)
 
 
 

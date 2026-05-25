@@ -17,10 +17,11 @@ import logo from "../assets/logo.png";
 
 const DRAWER_WIDTH = 220;
 
-export type Page = "registration" | "registrations-list" | "legal-representatives";
+export type Page = "registration" | "registrations-list" | "legal-representatives" | "account";
 
 const NAV_ITEMS: { label: string; page: Page; role: UserRole }[] = [
     { label: "Inscription", page: "registration", role: "legal_representative" },
+    { label: "Mon compte", page: "account", role: "legal_representative" },
     { label: "Inscriptions", page: "registrations-list", role: "registration_supervisor" },
     { label: "Représentants légaux", page: "legal-representatives", role: "registration_supervisor" },
 ];

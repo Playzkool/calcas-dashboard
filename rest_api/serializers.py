@@ -4,7 +4,7 @@ from datetime import date
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from registration.models import LegalRepresentative, Pupil, RegistrationCampaign, RegistrationFile
+from registration.models import LegalRepresentative, Pupil, PupilLegalRepresentative, RegistrationCampaign, RegistrationFile
 from registration.registration_enums import Grade
 
 
@@ -22,12 +22,15 @@ class RegistrationFileCreateSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
+        legal_representative = validated_data.pop("legal_representative", None)
         pupil = Pupil.objects.create(
             firstname=validated_data["firstname"],
             lastname=validated_data["lastname"],
             birth_date=validated_data["birth_date"],
             grade=validated_data["grade"],
         )
+        if legal_representative:
+            PupilLegalRepresentative.objects.create(pupil=pupil, legal_representative=legal_representative)
         today = date.today()
         campaign, _ = RegistrationCampaign.objects.get_or_create(year=date(today.year, 9, 1))
         return RegistrationFile.objects.create(
