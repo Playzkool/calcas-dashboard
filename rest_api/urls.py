@@ -1,6 +1,15 @@
 from django.urls import path
 
-from rest_api.views import CoRepresentativeView, LegalRepresentativesView, LoginView, LogoutView, MeView, MyRegistrationsView, RegistrationsView
+from rest_api.views import (
+    CoRepresentativeView,
+    LegalRepresentativesView,
+    LoginView,
+    LogoutView,
+    MeView,
+    MyProfileView,
+    MyRegistrationsView,
+    RegistrationsView,
+)
 
 urlpatterns = [
     path("login/", LoginView.as_view()),
@@ -10,4 +19,5 @@ urlpatterns = [
     path("my-registrations/", MyRegistrationsView.as_view()),
     path("legal-representatives/", LegalRepresentativesView.as_view()),
     path("co-representative/", CoRepresentativeView.as_view()),
+    path("my-profile/", MyProfileView.as_view()),
 ]

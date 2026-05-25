@@ -4,15 +4,39 @@ import { getCsrfToken } from "../lib/csrf";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
+const FILE_FIELDS: (keyof RegistrationFormType)[] = [
+    "document",
+    "vaccination_document",
+    "insurance_document",
+    "divorce_judgment",
+];
+
+const JSON_FIELDS: (keyof RegistrationFormType)[] = [
+    "diseases_history",
+    "emergency_contacts",
+    "authorized_pickup_persons",
+];
+
 export const submitRegistration = createAsyncThunk(
     "registration/submit",
     async (data: RegistrationFormType, { rejectWithValue }) => {
         const body = new FormData();
-        body.append("firstname", data.firstname);
-        body.append("lastname", data.lastname);
-        body.append("birth_date", data.birth_date.toISOString().split("T")[0]);
-        body.append("grade", String(data.grade));
-body.append("document", data.document);
+
+        for (const [key, value] of Object.entries(data) as [keyof RegistrationFormType, unknown][]) {
+            if (value === undefined || value === null) continue;
+
+            if (FILE_FIELDS.includes(key)) {
+                body.append(key, value as File);
+            } else if (JSON_FIELDS.includes(key)) {
+                body.append(key, JSON.stringify(value));
+            } else if (key === "birth_date" && value instanceof Date) {
+                body.append(key, value.toISOString().split("T")[0]);
+            } else if (typeof value === "boolean") {
+                body.append(key, value ? "true" : "false");
+            } else {
+                body.append(key, String(value));
+            }
+        }
 
         const res = await fetch(`${API_BASE}/api/registrations/`, {
             method: "POST",

@@ -19,6 +19,7 @@ from registration.models import (
 from rest_api.serializers import (
     LegalRepresentativeCreateSerializer,
     LegalRepresentativeListItemSerializer,
+    LegalRepresentativeProfileSerializer,
     RegistrationFileCreateSerializer,
     RegistrationListItemSerializer,
 )
@@ -154,6 +155,30 @@ class CoRepresentativeView(APIView):
         new_lr = serializer.save()
         PupilLegalRepresentative.objects.create(pupil=pupil, legal_representative=new_lr)
         return Response({"id": new_lr.id}, status=status.HTTP_201_CREATED)
+
+
+class MyProfileView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (SessionAuthentication,)
+    parser_classes = (MultiPartParser, JSONParser)
+
+    def get(self, request):
+        lr = LegalRepresentative.objects.filter(user=request.user).first()
+        if not lr:
+            return Response({"detail": "Réservé aux représentants légaux."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = LegalRepresentativeProfileSerializer(lr, context={"request": request})
+        return Response(serializer.data)
+
+    def patch(self, request):
+        lr = LegalRepresentative.objects.filter(user=request.user).first()
+        if not lr:
+            return Response({"detail": "Réservé aux représentants légaux."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = LegalRepresentativeProfileSerializer(
+            lr, data=request.data, partial=True, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class LegalRepresentativesView(APIView):

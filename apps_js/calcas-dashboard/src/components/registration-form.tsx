@@ -1,19 +1,36 @@
 import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
     Alert,
     Box,
     Button,
+    Checkbox,
     CircularProgress,
+    Divider,
     FormControl,
+    FormControlLabel,
     FormHelperText,
+    FormLabel,
+    IconButton,
     InputLabel,
     MenuItem,
+    Radio,
+    RadioGroup,
     Select,
     Stack,
     TextField,
     Typography,
 } from "@mui/material";
-import { Controller, useForm } from "react-hook-form";
-import { RegistrationFormSchema, type RegistrationFormType, type RegistrationFormInputType } from "../types.ts";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
+import {
+    RegistrationFormSchema,
+    type RegistrationFormType,
+    type RegistrationFormInputType,
+} from "../types.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { resetRegistration, submitRegistration } from "../store/registration-slice";
@@ -29,10 +46,57 @@ const GRADES: { label: string; value: number }[] = [
     { label: "CM2", value: 8 },
 ];
 
+const DISEASES = [
+    { key: "angine", label: "Angine" },
+    { key: "asthme", label: "Asthme" },
+    { key: "coqueluche", label: "Coqueluche" },
+    { key: "oreillons", label: "Oreillons" },
+    { key: "otites", label: "Otites" },
+    { key: "rhumatisme", label: "Rhumatisme" },
+    { key: "rougeole", label: "Rougeole" },
+    { key: "rubeole", label: "Rubéole" },
+    { key: "scarlatine", label: "Scarlatine" },
+    { key: "varicelle", label: "Varicelle" },
+] as const;
+
 const defaultValues = {
     firstname: "",
     lastname: "",
-};
+    diseases_history: {} as Record<string, boolean>,
+    emergency_contacts: [] as { name: string; phone: string; relation?: string }[],
+    authorized_pickup_persons: [] as { name: string; relation?: string; phone?: string; address?: string }[],
+} satisfies Partial<RegistrationFormInputType>;
+
+function FileUploadButton({
+    label,
+    accept,
+    value,
+    onChange,
+    error,
+    helperText,
+}: {
+    label: string;
+    accept?: string;
+    value?: File;
+    onChange: (f: File | undefined) => void;
+    error?: boolean;
+    helperText?: string;
+}) {
+    return (
+        <FormControl error={error}>
+            <Button variant="outlined" component="label" size="small">
+                {value ? value.name : label}
+                <input
+                    type="file"
+                    accept={accept ?? "application/pdf,image/*"}
+                    hidden
+                    onChange={(e) => onChange(e.target.files?.[0])}
+                />
+            </Button>
+            {helperText && <FormHelperText>{helperText}</FormHelperText>}
+        </FormControl>
+    );
+}
 
 export function RegistrationForm() {
     const dispatch = useAppDispatch();
@@ -42,125 +106,655 @@ export function RegistrationForm() {
         control,
         handleSubmit,
         reset,
+        watch,
         formState: { errors },
     } = useForm<RegistrationFormInputType, unknown, RegistrationFormType>({
         resolver: zodResolver(RegistrationFormSchema),
         defaultValues,
     });
 
+    const { fields: emergencyFields, append: appendEmergency, remove: removeEmergency } =
+        useFieldArray({ control, name: "emergency_contacts" });
+
+    const { fields: pickupFields, append: appendPickup, remove: removePickup } =
+        useFieldArray({ control, name: "authorized_pickup_persons" });
+
+    const familySituation = watch("family_situation");
+
     const onSubmit = (data: RegistrationFormType) => {
         dispatch(submitRegistration(data));
     };
 
     return (
-        <Box maxWidth={480} mx="auto" mt={4}>
+        <Box maxWidth={700} mx="auto" mt={4}>
             <Typography variant="h5" mb={3}>
-                Inscription
+                Inscription – Dossier de marcatge
             </Typography>
 
             <form onSubmit={handleSubmit(onSubmit)}>
-                <Stack spacing={3}>
-                    <Controller
-                        control={control}
-                        name="firstname"
-                        render={({ field }) => (
-                            <TextField
-                                label="Prénom"
-                                error={!!errors.firstname}
-                                helperText={errors.firstname?.message}
-                                {...field}
-                            />
-                        )}
-                    />
+                <Stack spacing={2}>
 
-                    <Controller
-                        control={control}
-                        name="lastname"
-                        render={({ field }) => (
-                            <TextField
-                                label="Nom"
-                                error={!!errors.lastname}
-                                helperText={errors.lastname?.message}
-                                {...field}
-                            />
-                        )}
-                    />
-
-                    <Controller
-                        control={control}
-                        name="birth_date"
-                        render={({ field: { value, onChange, ...rest } }) => (
-                            <TextField
-                                label="Date de naissance"
-                                type="date"
-                                slotProps={{ inputLabel: { shrink: true } }}
-                                value={
-                                    value instanceof Date && !isNaN(value.getTime())
-                                        ? value.toISOString().split("T")[0]
-                                        : (value as string) ?? ""
-                                }
-                                onChange={(e) => onChange(e.target.value)}
-                                error={!!errors.birth_date}
-                                helperText={errors.birth_date?.message}
-                                {...rest}
-                            />
-                        )}
-                    />
-
-                    <Controller
-                        control={control}
-                        name="grade"
-                        render={({ field }) => (
-                            <FormControl error={!!errors.grade}>
-                                <InputLabel>Niveau</InputLabel>
-                                <Select label="Niveau" {...field} value={field.value ?? ""}>
-                                    {GRADES.map((g) => (
-                                        <MenuItem key={g.value} value={g.value}>
-                                            {g.label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                {errors.grade && (
-                                    <FormHelperText>{errors.grade.message}</FormHelperText>
-                                )}
-                            </FormControl>
-                        )}
-                    />
-
-<Controller
-                        control={control}
-                        name="document"
-                        render={({ field: { onChange, value, ref } }) => (
-                            <FormControl error={!!errors.document}>
-                                <Button variant="outlined" component="label">
-                                    {value ? (value as File).name : "Joindre un document (PDF)"}
-                                    <input
-                                        type="file"
-                                        accept="application/pdf"
-                                        hidden
-                                        ref={ref}
-                                        onChange={(e) => onChange(e.target.files?.[0])}
+                    {/* ── 1. Informations de l'enfant ─────────────────────── */}
+                    <Accordion defaultExpanded>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography fontWeight={600}>1. Informations de l'enfant</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Stack spacing={2}>
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                                    <Controller
+                                        control={control}
+                                        name="firstname"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Prénom (pichon nom)"
+                                                fullWidth
+                                                error={!!errors.firstname}
+                                                helperText={errors.firstname?.message}
+                                                {...field}
+                                            />
+                                        )}
                                     />
-                                </Button>
-                                {errors.document && (
-                                    <FormHelperText>{errors.document.message}</FormHelperText>
-                                )}
-                            </FormControl>
-                        )}
-                    />
+                                    <Controller
+                                        control={control}
+                                        name="lastname"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Nom (nom d'ostal)"
+                                                fullWidth
+                                                error={!!errors.lastname}
+                                                helperText={errors.lastname?.message}
+                                                {...field}
+                                            />
+                                        )}
+                                    />
+                                </Stack>
 
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                                    <Controller
+                                        control={control}
+                                        name="birth_date"
+                                        render={({ field: { value, onChange, ...rest } }) => (
+                                            <TextField
+                                                label="Date de naissance"
+                                                type="date"
+                                                fullWidth
+                                                slotProps={{ inputLabel: { shrink: true } }}
+                                                value={
+                                                    value instanceof Date && !isNaN(value.getTime())
+                                                        ? value.toISOString().split("T")[0]
+                                                        : (value as string) ?? ""
+                                                }
+                                                onChange={(e) => onChange(e.target.value)}
+                                                error={!!errors.birth_date}
+                                                helperText={errors.birth_date?.message}
+                                                {...rest}
+                                            />
+                                        )}
+                                    />
+                                    <Controller
+                                        control={control}
+                                        name="birth_place"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Lieu de naissance"
+                                                fullWidth
+                                                {...field}
+                                            />
+                                        )}
+                                    />
+                                </Stack>
+
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                                    <Controller
+                                        control={control}
+                                        name="postal_code"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Code postal"
+                                                fullWidth
+                                                {...field}
+                                            />
+                                        )}
+                                    />
+                                    <Controller
+                                        control={control}
+                                        name="nationality"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Nationalité"
+                                                fullWidth
+                                                {...field}
+                                            />
+                                        )}
+                                    />
+                                </Stack>
+
+                                <Controller
+                                    control={control}
+                                    name="address"
+                                    render={({ field }) => (
+                                        <TextField
+                                            label="Adresse (adreiça)"
+                                            multiline
+                                            minRows={2}
+                                            fullWidth
+                                            {...field}
+                                        />
+                                    )}
+                                />
+
+                                <Controller
+                                    control={control}
+                                    name="grade"
+                                    render={({ field }) => (
+                                        <FormControl error={!!errors.grade} fullWidth>
+                                            <InputLabel>Classe (classa)</InputLabel>
+                                            <Select label="Classe (classa)" {...field} value={field.value ?? ""}>
+                                                {GRADES.map((g) => (
+                                                    <MenuItem key={g.value} value={g.value}>
+                                                        {g.label}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                            {errors.grade && (
+                                                <FormHelperText>{errors.grade.message}</FormHelperText>
+                                            )}
+                                        </FormControl>
+                                    )}
+                                />
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
+
+                    {/* ── 2. Situation familiale ───────────────────────────── */}
+                    <Accordion>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography fontWeight={600}>2. Situation familiale (entresenhas familhalas)</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Stack spacing={2}>
+                                <Controller
+                                    control={control}
+                                    name="family_situation"
+                                    render={({ field }) => (
+                                        <FormControl>
+                                            <FormLabel>Situation des parents</FormLabel>
+                                            <RadioGroup {...field} value={field.value ?? ""}>
+                                                <FormControlLabel
+                                                    value="married_or_cohabiting"
+                                                    control={<Radio />}
+                                                    label="Mariés ou concubins"
+                                                />
+                                                <FormControlLabel
+                                                    value="divorced_or_separated"
+                                                    control={<Radio />}
+                                                    label="Divorcés ou séparés"
+                                                />
+                                                <FormControlLabel
+                                                    value="single_parent"
+                                                    control={<Radio />}
+                                                    label="Parent isolé"
+                                                />
+                                            </RadioGroup>
+                                        </FormControl>
+                                    )}
+                                />
+
+                                <Stack direction="row" spacing={2}>
+                                    <Controller
+                                        control={control}
+                                        name="siblings_brothers"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Nombre de frères"
+                                                type="number"
+                                                slotProps={{ htmlInput: { min: 0 } }}
+                                                fullWidth
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        )}
+                                    />
+                                    <Controller
+                                        control={control}
+                                        name="siblings_sisters"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Nombre de sœurs"
+                                                type="number"
+                                                slotProps={{ htmlInput: { min: 0 } }}
+                                                fullWidth
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        )}
+                                    />
+                                </Stack>
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
+
+                    {/* ── 3. Fiche sanitaire de liaison ────────────────────── */}
+                    <Accordion>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography fontWeight={600}>3. Fiche sanitaire de liaison</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Stack spacing={2}>
+                                <Controller
+                                    control={control}
+                                    name="other_vaccines"
+                                    render={({ field }) => (
+                                        <TextField
+                                            label="Autres vaccinations (DTP / Tétracoq inclus)"
+                                            multiline
+                                            minRows={2}
+                                            fullWidth
+                                            placeholder="Ex: DTP à jour, vaccin contre l'hépatite B…"
+                                            {...field}
+                                            value={field.value ?? ""}
+                                        />
+                                    )}
+                                />
+
+                                <Box>
+                                    <Typography variant="body2" fontWeight={500} mb={1}>
+                                        Maladies antérieures
+                                    </Typography>
+                                    <Box
+                                        display="grid"
+                                        gridTemplateColumns={{ xs: "1fr 1fr", sm: "1fr 1fr 1fr" }}
+                                        gap={0}
+                                    >
+                                        {DISEASES.map(({ key, label }) => (
+                                            <Controller
+                                                key={key}
+                                                control={control}
+                                                name={`diseases_history.${key}`}
+                                                render={({ field }) => (
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Checkbox
+                                                                checked={!!field.value}
+                                                                onChange={(e) => field.onChange(e.target.checked)}
+                                                                size="small"
+                                                            />
+                                                        }
+                                                        label={label}
+                                                    />
+                                                )}
+                                            />
+                                        ))}
+                                    </Box>
+                                </Box>
+
+                                <Controller
+                                    control={control}
+                                    name="samu_authorized"
+                                    render={({ field }) => (
+                                        <FormControl>
+                                            <FormLabel>
+                                                En cas de maladie ou d'accident, j'autorise l'école à appeler
+                                                le SAMU, les pompiers ou un médecin
+                                            </FormLabel>
+                                            <RadioGroup
+                                                row
+                                                value={field.value === true ? "oui" : field.value === false ? "non" : ""}
+                                                onChange={(e) => field.onChange(e.target.value === "oui")}
+                                            >
+                                                <FormControlLabel value="oui" control={<Radio />} label="Oui" />
+                                                <FormControlLabel value="non" control={<Radio />} label="Non" />
+                                            </RadioGroup>
+                                        </FormControl>
+                                    )}
+                                />
+
+                                <Controller
+                                    control={control}
+                                    name="allergies_info"
+                                    render={({ field }) => (
+                                        <TextField
+                                            label="Allergies / autres informations médicales"
+                                            multiline
+                                            minRows={2}
+                                            fullWidth
+                                            {...field}
+                                            value={field.value ?? ""}
+                                        />
+                                    )}
+                                />
+
+                                {/* Emergency contacts */}
+                                <Box>
+                                    <Typography variant="body2" fontWeight={500} mb={1}>
+                                        Personnes à prévenir en cas d'urgence
+                                    </Typography>
+                                    <Stack spacing={1}>
+                                        {emergencyFields.map((item, index) => (
+                                            <Stack key={item.id} direction="row" spacing={1} alignItems="flex-start">
+                                                <Controller
+                                                    control={control}
+                                                    name={`emergency_contacts.${index}.name`}
+                                                    render={({ field }) => (
+                                                        <TextField label="Nom / Prénom" size="small" {...field} />
+                                                    )}
+                                                />
+                                                <Controller
+                                                    control={control}
+                                                    name={`emergency_contacts.${index}.phone`}
+                                                    render={({ field }) => (
+                                                        <TextField label="Téléphone" size="small" {...field} />
+                                                    )}
+                                                />
+                                                <Controller
+                                                    control={control}
+                                                    name={`emergency_contacts.${index}.relation`}
+                                                    render={({ field }) => (
+                                                        <TextField label="Lien (facultatif)" size="small" {...field} />
+                                                    )}
+                                                />
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => removeEmergency(index)}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Stack>
+                                        ))}
+                                        <Button
+                                            size="small"
+                                            startIcon={<AddIcon />}
+                                            onClick={() => appendEmergency({ name: "", phone: "" })}
+                                            sx={{ alignSelf: "flex-start" }}
+                                        >
+                                            Ajouter une personne
+                                        </Button>
+                                    </Stack>
+                                </Box>
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
+
+                    {/* ── 4. Autorisations ─────────────────────────────────── */}
+                    <Accordion>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography fontWeight={600}>4. Autorisations</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Stack spacing={3}>
+                                {/* Sortie pédagogique */}
+                                <Box>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Autorisation permanente de sortie pédagogique
+                                    </Typography>
+                                    <Controller
+                                        control={control}
+                                        name="school_trips_authorized"
+                                        render={({ field }) => (
+                                            <FormControl>
+                                                <FormLabel>
+                                                    J'autorise mon enfant à participer à toutes les sorties
+                                                    organisées par les enseignants
+                                                </FormLabel>
+                                                <RadioGroup
+                                                    row
+                                                    value={field.value === true ? "oui" : field.value === false ? "non" : ""}
+                                                    onChange={(e) => field.onChange(e.target.value === "oui")}
+                                                >
+                                                    <FormControlLabel value="oui" control={<Radio />} label="Oui" />
+                                                    <FormControlLabel value="non" control={<Radio />} label="Non" />
+                                                </RadioGroup>
+                                            </FormControl>
+                                        )}
+                                    />
+                                    <Controller
+                                        control={control}
+                                        name="doctor_name_phone"
+                                        render={({ field }) => (
+                                            <TextField
+                                                label="Médecin traitant (nom et numéro)"
+                                                fullWidth
+                                                size="small"
+                                                sx={{ mt: 1 }}
+                                                {...field}
+                                                value={field.value ?? ""}
+                                            />
+                                        )}
+                                    />
+                                </Box>
+
+                                <Divider />
+
+                                {/* Droit à l'image */}
+                                <Box>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Droit à l'image
+                                    </Typography>
+                                    <Controller
+                                        control={control}
+                                        name="image_rights_authorized"
+                                        render={({ field }) => (
+                                            <FormControl>
+                                                <FormLabel>
+                                                    J'autorise l'école Calandreta et l'association Festa d'Oc à
+                                                    photographier/filmer mon enfant (presse, site internet, plaquettes…)
+                                                </FormLabel>
+                                                <RadioGroup
+                                                    row
+                                                    value={field.value === true ? "oui" : field.value === false ? "non" : ""}
+                                                    onChange={(e) => field.onChange(e.target.value === "oui")}
+                                                >
+                                                    <FormControlLabel value="oui" control={<Radio />} label="Oui" />
+                                                    <FormControlLabel value="non" control={<Radio />} label="Non" />
+                                                </RadioGroup>
+                                            </FormControl>
+                                        )}
+                                    />
+                                </Box>
+
+                                <Divider />
+
+                                {/* Personnes autorisées à récupérer l'enfant */}
+                                <Box>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Personnes autorisées à venir chercher l'enfant
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                                        Les deux parents sont toujours autorisés. Renseignez ici les autres personnes.
+                                    </Typography>
+                                    <Stack spacing={1}>
+                                        {pickupFields.map((item, index) => (
+                                            <Stack
+                                                key={item.id}
+                                                direction={{ xs: "column", sm: "row" }}
+                                                spacing={1}
+                                                alignItems="flex-start"
+                                            >
+                                                <Controller
+                                                    control={control}
+                                                    name={`authorized_pickup_persons.${index}.name`}
+                                                    render={({ field }) => (
+                                                        <TextField label="Nom / Prénom" size="small" {...field} />
+                                                    )}
+                                                />
+                                                <Controller
+                                                    control={control}
+                                                    name={`authorized_pickup_persons.${index}.relation`}
+                                                    render={({ field }) => (
+                                                        <TextField
+                                                            label="Lien (oncle, voisin…)"
+                                                            size="small"
+                                                            {...field}
+                                                        />
+                                                    )}
+                                                />
+                                                <Controller
+                                                    control={control}
+                                                    name={`authorized_pickup_persons.${index}.phone`}
+                                                    render={({ field }) => (
+                                                        <TextField label="Téléphone" size="small" {...field} />
+                                                    )}
+                                                />
+                                                <Controller
+                                                    control={control}
+                                                    name={`authorized_pickup_persons.${index}.address`}
+                                                    render={({ field }) => (
+                                                        <TextField label="Adresse (facultatif)" size="small" {...field} />
+                                                    )}
+                                                />
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => removePickup(index)}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Stack>
+                                        ))}
+                                        <Button
+                                            size="small"
+                                            startIcon={<AddIcon />}
+                                            onClick={() => appendPickup({ name: "" })}
+                                            sx={{ alignSelf: "flex-start" }}
+                                        >
+                                            Ajouter une personne
+                                        </Button>
+                                    </Stack>
+                                </Box>
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
+
+                    {/* ── 5. Documents à joindre ───────────────────────────── */}
+                    <Accordion>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography fontWeight={600}>5. Pièces justificatives</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Stack spacing={2}>
+                                <Typography variant="caption" color="text.secondary">
+                                    Formats acceptés : PDF ou image (JPG, PNG).
+                                </Typography>
+
+                                <Controller
+                                    control={control}
+                                    name="vaccination_document"
+                                    render={({ field: { onChange, value } }) => (
+                                        <FileUploadButton
+                                            label="Carnet de santé / attestation vaccinale"
+                                            value={value as File | undefined}
+                                            onChange={onChange}
+                                            error={!!errors.vaccination_document}
+                                            helperText={errors.vaccination_document?.message as string}
+                                        />
+                                    )}
+                                />
+
+                                <Controller
+                                    control={control}
+                                    name="insurance_document"
+                                    render={({ field: { onChange, value } }) => (
+                                        <FileUploadButton
+                                            label="Attestation d'assurance (RC + dommage corporel)"
+                                            value={value as File | undefined}
+                                            onChange={onChange}
+                                            error={!!errors.insurance_document}
+                                            helperText={errors.insurance_document?.message as string}
+                                        />
+                                    )}
+                                />
+
+                                {familySituation === "divorced_or_separated" && (
+                                    <Controller
+                                        control={control}
+                                        name="divorce_judgment"
+                                        render={({ field: { onChange, value } }) => (
+                                            <FileUploadButton
+                                                label="Copie du dernier jugement (divorce/séparation)"
+                                                value={value as File | undefined}
+                                                onChange={onChange}
+                                                error={!!errors.divorce_judgment}
+                                                helperText={errors.divorce_judgment?.message as string}
+                                            />
+                                        )}
+                                    />
+                                )}
+
+                                <Controller
+                                    control={control}
+                                    name="document"
+                                    render={({ field: { onChange, value } }) => (
+                                        <FileUploadButton
+                                            label="Autre document (facultatif)"
+                                            value={value as File | undefined}
+                                            onChange={onChange}
+                                            error={!!errors.document}
+                                            helperText={errors.document?.message as string}
+                                        />
+                                    )}
+                                />
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
+
+                    {/* ── 6. Charte Calandreta ─────────────────────────────── */}
+                    <Accordion>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography fontWeight={600}>6. Charte Calandreta et règlement intérieur</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Stack spacing={1}>
+                                <Typography variant="body2" color="text.secondary">
+                                    En cochant cette case, je déclare avoir lu et compris l'ensemble
+                                    de la Charte des Calandretas ainsi que le règlement intérieur de la
+                                    Calandreta de Castanet Tolosan, et je m'engage à les respecter sur
+                                    la durée totale de scolarisation de mon enfant.
+                                </Typography>
+                                <Controller
+                                    control={control}
+                                    name="charter_accepted"
+                                    render={({ field }) => (
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={!!field.value}
+                                                    onChange={(e) => field.onChange(e.target.checked)}
+                                                />
+                                            }
+                                            label="Lu et approuvé – j'accepte la Charte Calandreta et le règlement intérieur"
+                                        />
+                                    )}
+                                />
+                            </Stack>
+                        </AccordionDetails>
+                    </Accordion>
+
+                    {/* ── Submit ───────────────────────────────────────────── */}
                     <Button
                         type="submit"
                         variant="contained"
+                        size="large"
                         disabled={status === "loading"}
-                        startIcon={status === "loading" ? <CircularProgress size={16} color="inherit" /> : null}
+                        startIcon={
+                            status === "loading" ? (
+                                <CircularProgress size={16} color="inherit" />
+                            ) : null
+                        }
                     >
-                        {status === "loading" ? "Envoi en cours…" : "S'inscrire"}
+                        {status === "loading" ? "Envoi en cours…" : "Envoyer le dossier"}
                     </Button>
 
                     {status === "succeeded" && (
-                        <Alert severity="success" onClose={() => { dispatch(resetRegistration()); reset(defaultValues); }}>
-                            Inscription envoyée avec succès.
+                        <Alert
+                            severity="success"
+                            onClose={() => {
+                                dispatch(resetRegistration());
+                                reset(defaultValues);
+                            }}
+                        >
+                            Dossier envoyé avec succès.
                         </Alert>
                     )}
                     {status === "failed" && (
