@@ -15,7 +15,12 @@ from registration.models import (
     RegistrationFile,
     RegistrationSupervisor,
 )
-from rest_api.serializers import RegistrationFileCreateSerializer, RegistrationListItemSerializer
+from rest_api.serializers import (
+    LegalRepresentativeCreateSerializer,
+    LegalRepresentativeListItemSerializer,
+    RegistrationFileCreateSerializer,
+    RegistrationListItemSerializer,
+)
 
 
 def _get_role(user):
@@ -85,3 +90,23 @@ class RegistrationsView(APIView):
         serializer.is_valid(raise_exception=True)
         registration_file = serializer.save()
         return Response({"id": registration_file.id}, status=status.HTTP_201_CREATED)
+
+
+class LegalRepresentativesView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (SessionAuthentication,)
+
+    def get(self, request):
+        if not RegistrationSupervisor.objects.filter(user=request.user).exists():
+            return Response({"detail": "Réservé aux gestionnaires."}, status=status.HTTP_403_FORBIDDEN)
+        qs = LegalRepresentative.objects.select_related("user").order_by("-date_creation")
+        serializer = LegalRepresentativeListItemSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        if not RegistrationSupervisor.objects.filter(user=request.user).exists():
+            return Response({"detail": "Réservé aux gestionnaires."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = LegalRepresentativeCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        lr = serializer.save()
+        return Response({"id": lr.id}, status=status.HTTP_201_CREATED)

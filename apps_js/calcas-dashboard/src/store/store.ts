@@ -1,5 +1,6 @@
 import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./auth-slice";
+import legalRepresentativesReducer from "./legal-representatives-slice";
 import registrationReducer from "./registration-slice";
 import registrationsListReducer from "./registrations-list-slice";
 
@@ -8,6 +9,7 @@ export const store = configureStore({
         auth: authReducer,
         registration: registrationReducer,
         registrationsList: registrationsListReducer,
+        legalRepresentatives: legalRepresentativesReducer,
     },
 });
 

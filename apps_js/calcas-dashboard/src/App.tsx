@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Box, CircularProgress, createTheme, CssBaseline, ThemeProvider } from "@mui/material";
 import { Layout, type Page } from "./components/layout";
 import { LoginPage } from "./components/login-page";
+import { LegalRepresentativesList } from "./components/legal-representatives-list";
 import { RegistrationForm } from "./components/registration-form";
 import { RegistrationsList } from "./components/registrations-list";
 import { useAppDispatch, useAppSelector } from "./hooks";
@@ -16,6 +17,7 @@ const ROLE_DEFAULT_PAGE: Record<UserRole, Page> = {
 const PAGE_COMPONENTS: Record<Page, React.ReactNode> = {
     registration: <RegistrationForm />,
     "registrations-list": <RegistrationsList />,
+    "legal-representatives": <LegalRepresentativesList />,
 };
 
 function App() {

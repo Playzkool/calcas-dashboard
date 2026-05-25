@@ -1,8 +1,10 @@
+import secrets
 from datetime import date
 
+from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from registration.models import Pupil, RegistrationCampaign, RegistrationFile
+from registration.models import LegalRepresentative, Pupil, RegistrationCampaign, RegistrationFile
 from registration.registration_enums import Grade
 
 
@@ -55,3 +57,30 @@ class RegistrationListItemSerializer(serializers.ModelSerializer):
             return None
         request = self.context.get("request")
         return request.build_absolute_uri(obj.document.url) if request else obj.document.url
+
+
+class LegalRepresentativeListItemSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username")
+    email = serializers.EmailField(source="user.email")
+
+    class Meta:
+        model = LegalRepresentative
+        fields = ["id", "username", "email", "date_creation"]
+
+
+class LegalRepresentativeCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Un compte avec cet email existe déjà.")
+        return value
+
+    def create(self, validated_data):
+        email = validated_data["email"]
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=secrets.token_urlsafe(32),
+        )
+        return LegalRepresentative.objects.create(user=user)
