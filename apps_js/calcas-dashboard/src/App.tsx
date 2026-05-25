@@ -4,7 +4,7 @@ import { Layout, type Page } from "./components/layout";
 import { LoginPage } from "./components/login-page";
 import { AccountPage } from "./components/account-page";
 import { LegalRepresentativesList } from "./components/legal-representatives-list";
-import { RegistrationForm } from "./components/registration-form";
+import { RegistrationPage } from "./components/registration-page";
 import { RegistrationsList } from "./components/registrations-list";
 import { useAppDispatch, useAppSelector } from "./hooks";
 import { fetchMe, logoutUser } from "./store/auth-slice";
@@ -16,7 +16,7 @@ const ROLE_DEFAULT_PAGE: Record<UserRole, Page> = {
 };
 
 const PAGE_COMPONENTS: Record<Page, React.ReactNode> = {
-    registration: <RegistrationForm />,
+    registration: <RegistrationPage />,
     account: <AccountPage />,
     "registrations-list": <RegistrationsList />,
     "legal-representatives": <LegalRepresentativesList />,

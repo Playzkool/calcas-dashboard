@@ -31,6 +31,24 @@ class RegistrationFileCreateSerializer(serializers.Serializer):
         )
         if legal_representative:
             PupilLegalRepresentative.objects.create(pupil=pupil, legal_representative=legal_representative)
+            # If all existing pupils share exactly one co-representative, auto-link them to the new pupil.
+            existing_pupil_ids = (
+                PupilLegalRepresentative.objects
+                .filter(legal_representative=legal_representative)
+                .exclude(pupil=pupil)
+                .values_list("pupil_id", flat=True)
+            )
+            if existing_pupil_ids:
+                co_rep_ids = list(
+                    PupilLegalRepresentative.objects
+                    .filter(pupil_id__in=existing_pupil_ids)
+                    .exclude(legal_representative=legal_representative)
+                    .values_list("legal_representative_id", flat=True)
+                    .distinct()
+                )
+                if len(co_rep_ids) == 1:
+                    co_rep = LegalRepresentative.objects.get(id=co_rep_ids[0])
+                    PupilLegalRepresentative.objects.create(pupil=pupil, legal_representative=co_rep)
         today = date.today()
         campaign, _ = RegistrationCampaign.objects.get_or_create(year=date(today.year, 9, 1))
         return RegistrationFile.objects.create(

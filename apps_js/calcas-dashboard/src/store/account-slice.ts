@@ -1,10 +1,11 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { getCsrfToken } from "../lib/csrf";
 
-export interface AccountInfo {
-    has_pupil: boolean;
-    pupil_firstname: string | null;
-    pupil_lastname: string | null;
+export interface PupilAccountEntry {
+    pupil_id: number;
+    pupil_firstname: string;
+    pupil_lastname: string;
+    grade_label: string;
     co_representative_email: string | null;
 }
 
@@ -13,18 +14,18 @@ export const fetchAccountInfo = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         const res = await fetch("/api/co-representative/", { credentials: "include" });
         if (!res.ok) return rejectWithValue(await res.text());
-        return res.json() as Promise<AccountInfo>;
+        return res.json() as Promise<PupilAccountEntry[]>;
     }
 );
 
 export const createCoRepresentative = createAsyncThunk(
     "account/createCoRepresentative",
-    async (email: string, { rejectWithValue }) => {
+    async ({ email, pupilId }: { email: string; pupilId: number }, { rejectWithValue }) => {
         const res = await fetch("/api/co-representative/", {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-CSRFToken": getCsrfToken() },
             credentials: "include",
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ email, pupil_id: pupilId }),
         });
         if (!res.ok) {
             try {
@@ -40,7 +41,7 @@ export const createCoRepresentative = createAsyncThunk(
 );
 
 interface AccountState {
-    info: AccountInfo | null;
+    pupils: PupilAccountEntry[];
     fetchStatus: "idle" | "loading" | "succeeded" | "failed";
     fetchError: string | null;
     createStatus: "idle" | "loading" | "succeeded" | "failed";
@@ -48,7 +49,7 @@ interface AccountState {
 }
 
 const initialState: AccountState = {
-    info: null,
+    pupils: [],
     fetchStatus: "idle",
     fetchError: null,
     createStatus: "idle",
@@ -69,7 +70,7 @@ const accountSlice = createSlice({
             .addCase(fetchAccountInfo.pending, (state) => { state.fetchStatus = "loading"; })
             .addCase(fetchAccountInfo.fulfilled, (state, action) => {
                 state.fetchStatus = "succeeded";
-                state.info = action.payload;
+                state.pupils = action.payload;
             })
             .addCase(fetchAccountInfo.rejected, (state, action) => {
                 state.fetchStatus = "failed";
