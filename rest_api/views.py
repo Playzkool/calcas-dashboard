@@ -20,6 +20,7 @@ from rest_api.serializers import (
     LegalRepresentativeCreateSerializer,
     LegalRepresentativeListItemSerializer,
     LegalRepresentativeProfileSerializer,
+    RegistrationDetailSerializer,
     RegistrationFileCreateSerializer,
     RegistrationListItemSerializer,
 )
@@ -199,3 +200,18 @@ class LegalRepresentativesView(APIView):
         serializer.is_valid(raise_exception=True)
         lr = serializer.save()
         return Response({"id": lr.id}, status=status.HTTP_201_CREATED)
+
+
+class RegistrationDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (SessionAuthentication,)
+
+    def get(self, request, pk):
+        if not RegistrationSupervisor.objects.filter(user=request.user).exists():
+            return Response({"detail": "Réservé aux gestionnaires."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            registration = RegistrationFile.objects.select_related("pupil").get(pk=pk)
+        except RegistrationFile.DoesNotExist:
+            return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = RegistrationDetailSerializer(registration, context={"request": request})
+        return Response(serializer.data)

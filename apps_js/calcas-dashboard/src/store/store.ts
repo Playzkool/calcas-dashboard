@@ -5,6 +5,7 @@ import legalRepresentativesReducer from "./legal-representatives-slice";
 import myRegistrationsReducer from "./my-registrations-slice";
 import profileReducer from "./profile-slice";
 import registrationReducer from "./registration-slice";
+import registrationDetailReducer from "./registration-detail-slice";
 import registrationsListReducer from "./registrations-list-slice";
 
 export const store = configureStore({
@@ -14,6 +15,7 @@ export const store = configureStore({
         myRegistrations: myRegistrationsReducer,
         profile: profileReducer,
         registration: registrationReducer,
+        registrationDetail: registrationDetailReducer,
         registrationsList: registrationsListReducer,
         legalRepresentatives: legalRepresentativesReducer,
     },

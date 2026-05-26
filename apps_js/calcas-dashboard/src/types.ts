@@ -121,3 +121,66 @@ export interface ProfileData {
     pool_accompaniment: boolean
     pool_attestation: string | null
 }
+
+// ─── Registration detail (supervisor view) ───────────────────────────────────
+
+export interface LegalRepresentativeDetail {
+    id: number
+    email: string
+    username: string
+    firstname: string | null
+    lastname: string | null
+    birth_date: string | null
+    address: string | null
+    phone_home: string | null
+    phone_mobile: string | null
+    phone_work: string | null
+    profession: string | null
+    has_parental_authority: boolean | null
+    insurance_reference: string | null
+    coordinates_sharing_authorized: boolean | null
+    pool_accompaniment: boolean
+    pool_attestation_url: string | null
+}
+
+export interface RegistrationDetail {
+    id: number
+    // Élève
+    firstname: string
+    lastname: string
+    birth_date: string
+    birth_place: string | null
+    postal_code: string | null
+    nationality: string | null
+    address: string | null
+    grade: number
+    grade_label: string
+    family_situation: string | null
+    siblings_brothers: number | null
+    siblings_sisters: number | null
+    // Documents
+    document_url: string | null
+    vaccination_document_url: string | null
+    insurance_document_url: string | null
+    divorce_judgment_url: string | null
+    // Fiche sanitaire
+    other_vaccines: string | null
+    diseases_history: Record<string, boolean>
+    samu_authorized: boolean | null
+    emergency_contacts: Array<{ name: string; phone: string; relation?: string }>
+    allergies_info: string | null
+    // Autorisations
+    school_trips_authorized: boolean | null
+    doctor_name_phone: string | null
+    image_rights_authorized: boolean | null
+    authorized_pickup_persons: Array<{
+        name: string
+        relation?: string
+        phone?: string
+        address?: string
+    }>
+    // Charte
+    charter_accepted: boolean
+    // Représentants légaux
+    legal_representatives: LegalRepresentativeDetail[]
+}

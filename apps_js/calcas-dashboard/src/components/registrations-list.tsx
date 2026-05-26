@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
     Alert,
     Box,
@@ -10,18 +10,31 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    Tooltip,
     Typography,
 } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { fetchRegistrations } from "../store/registrations-list-slice";
+import { RegistrationDetailView } from "./registration-detail";
 
 export function RegistrationsList() {
     const dispatch = useAppDispatch();
     const { items, status, error } = useAppSelector((s) => s.registrationsList);
+    const [selectedId, setSelectedId] = useState<number | null>(null);
 
     useEffect(() => {
         if (status === "idle") dispatch(fetchRegistrations());
     }, [dispatch, status]);
+
+    // Si un item est sélectionné, afficher la vue détail
+    if (selectedId !== null) {
+        return (
+            <RegistrationDetailView
+                id={selectedId}
+                onBack={() => setSelectedId(null)}
+            />
+        );
+    }
 
     if (status === "idle" || status === "loading") {
         return (
@@ -56,21 +69,27 @@ export function RegistrationsList() {
                         </TableHead>
                         <TableBody>
                             {items.map((item) => (
-                                <TableRow key={item.id}>
-                                    <TableCell>{item.firstname}</TableCell>
-                                    <TableCell>{item.lastname}</TableCell>
-                                    <TableCell>{item.birth_date}</TableCell>
-                                    <TableCell>{item.grade_label}</TableCell>
-                                    <TableCell>
-                                        {item.document_url ? (
-                                            <a href={item.document_url} target="_blank" rel="noreferrer">
-                                                Voir
-                                            </a>
-                                        ) : (
-                                            "—"
-                                        )}
-                                    </TableCell>
-                                </TableRow>
+                                <Tooltip title="Voir le dossier complet" key={item.id} placement="left">
+                                    <TableRow
+                                        hover
+                                        onClick={() => setSelectedId(item.id)}
+                                        sx={{ cursor: "pointer" }}
+                                    >
+                                        <TableCell>{item.firstname}</TableCell>
+                                        <TableCell>{item.lastname}</TableCell>
+                                        <TableCell>{item.birth_date}</TableCell>
+                                        <TableCell>{item.grade_label}</TableCell>
+                                        <TableCell onClick={(e) => e.stopPropagation()}>
+                                            {item.document_url ? (
+                                                <a href={item.document_url} target="_blank" rel="noreferrer">
+                                                    Voir
+                                                </a>
+                                            ) : (
+                                                "—"
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                </Tooltip>
                             ))}
                         </TableBody>
                     </Table>

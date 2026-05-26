@@ -8,6 +8,111 @@ from registration.models import LegalRepresentative, Pupil, PupilLegalRepresenta
 from registration.registration_enums import Grade
 
 
+class LegalRepresentativeDetailSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source="user.email", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    pool_attestation_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LegalRepresentative
+        fields = [
+            "id", "email", "username",
+            "firstname", "lastname", "birth_date",
+            "address", "phone_home", "phone_mobile", "phone_work",
+            "profession", "has_parental_authority", "insurance_reference",
+            "coordinates_sharing_authorized",
+            "pool_accompaniment", "pool_attestation_url",
+        ]
+
+    def get_pool_attestation_url(self, obj):
+        if not obj.pool_attestation:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.pool_attestation.url) if request else obj.pool_attestation.url
+
+
+class RegistrationDetailSerializer(serializers.ModelSerializer):
+    # Pupil fields
+    firstname = serializers.CharField(source="pupil.firstname")
+    lastname = serializers.CharField(source="pupil.lastname")
+    birth_date = serializers.DateField(source="pupil.birth_date")
+    birth_place = serializers.CharField(source="pupil.birth_place")
+    postal_code = serializers.CharField(source="pupil.postal_code")
+    nationality = serializers.CharField(source="pupil.nationality")
+    address = serializers.CharField(source="pupil.address")
+    grade = serializers.IntegerField(source="pupil.grade")
+    grade_label = serializers.SerializerMethodField()
+    family_situation = serializers.CharField(source="pupil.family_situation")
+    siblings_brothers = serializers.IntegerField(source="pupil.siblings_brothers")
+    siblings_sisters = serializers.IntegerField(source="pupil.siblings_sisters")
+
+    # Document URLs
+    document_url = serializers.SerializerMethodField()
+    vaccination_document_url = serializers.SerializerMethodField()
+    insurance_document_url = serializers.SerializerMethodField()
+    divorce_judgment_url = serializers.SerializerMethodField()
+
+    # Legal representatives
+    legal_representatives = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RegistrationFile
+        fields = [
+            "id",
+            # Pupil
+            "firstname", "lastname", "birth_date", "birth_place",
+            "postal_code", "nationality", "address", "grade", "grade_label",
+            "family_situation", "siblings_brothers", "siblings_sisters",
+            # Documents
+            "document_url", "vaccination_document_url",
+            "insurance_document_url", "divorce_judgment_url",
+            # Fiche sanitaire
+            "other_vaccines", "diseases_history", "samu_authorized",
+            "emergency_contacts", "allergies_info",
+            # Autorisations
+            "school_trips_authorized", "doctor_name_phone",
+            "image_rights_authorized",
+            "authorized_pickup_persons",
+            # Charte
+            "charter_accepted",
+            # Legal representatives
+            "legal_representatives",
+        ]
+
+    def get_grade_label(self, obj):
+        return obj.pupil.get_grade_display()
+
+    def _build_url(self, obj, field_name):
+        field_file = getattr(obj, field_name)
+        if not field_file:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(field_file.url) if request else field_file.url
+
+    def get_document_url(self, obj):
+        return self._build_url(obj, "document")
+
+    def get_vaccination_document_url(self, obj):
+        return self._build_url(obj, "vaccination_document")
+
+    def get_insurance_document_url(self, obj):
+        return self._build_url(obj, "insurance_document")
+
+    def get_divorce_judgment_url(self, obj):
+        return self._build_url(obj, "divorce_judgment")
+
+    def get_legal_representatives(self, obj):
+        plrs = (
+            PupilLegalRepresentative.objects
+            .filter(pupil=obj.pupil)
+            .select_related("legal_representative__user")
+        )
+        lrs = [plr.legal_representative for plr in plrs]
+        return LegalRepresentativeDetailSerializer(
+            lrs, many=True, context=self.context
+        ).data
+
+
 class RegistrationFileCreateSerializer(serializers.Serializer):
     # Child info
     firstname = serializers.CharField(max_length=100)
