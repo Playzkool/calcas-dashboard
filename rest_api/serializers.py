@@ -212,20 +212,53 @@ class RegistrationListItemSerializer(serializers.ModelSerializer):
     birth_date = serializers.DateField(source="pupil.birth_date")
     grade = serializers.IntegerField(source="pupil.grade")
     grade_label = serializers.SerializerMethodField()
-    document_url = serializers.SerializerMethodField()
+    completion_pct = serializers.SerializerMethodField()
 
     class Meta:
         model = RegistrationFile
-        fields = ["id", "firstname", "lastname", "birth_date", "grade", "grade_label", "document_url"]
+        fields = ["id", "firstname", "lastname", "birth_date", "grade", "grade_label", "completion_pct"]
 
     def get_grade_label(self, obj):
         return obj.pupil.get_grade_display()
 
-    def get_document_url(self, obj):
-        if not obj.document:
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(obj.document.url) if request else obj.document.url
+    def get_completion_pct(self, obj):
+        """
+        16 equally-weighted criteria (each = 6.25 %).
+        Requires pupil__pupillegalrepresentative_set__legal_representative to be prefetched.
+        """
+        pupil = obj.pupil
+        criteria = [
+            # Pupil info
+            bool(pupil.birth_place),
+            bool(pupil.nationality),
+            bool(pupil.address),
+            bool(pupil.family_situation),
+            # Documents
+            bool(obj.document),
+            bool(obj.vaccination_document),
+            bool(obj.insurance_document),
+            # Fiche sanitaire
+            obj.samu_authorized is not None,
+            bool(obj.emergency_contacts),
+            bool(obj.doctor_name_phone),
+            # Autorisations
+            obj.school_trips_authorized is not None,
+            obj.image_rights_authorized is not None,
+            bool(obj.authorized_pickup_persons),
+            obj.charter_accepted is True,
+            # Legal representative profile
+            any(
+                (plr.legal_representative.firstname and plr.legal_representative.lastname)
+                for plr in pupil.pupillegalrepresentative_set.all()
+            ),
+            any(
+                (plr.legal_representative.phone_mobile
+                 or plr.legal_representative.phone_home
+                 or plr.legal_representative.phone_work)
+                for plr in pupil.pupillegalrepresentative_set.all()
+            ),
+        ]
+        return round(sum(criteria) * 100 / len(criteria))
 
 
 class LegalRepresentativeListItemSerializer(serializers.ModelSerializer):

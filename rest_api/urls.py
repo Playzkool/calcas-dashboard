@@ -9,6 +9,7 @@ from rest_api.views import (
     MyProfileView,
     MyRegistrationsView,
     RegistrationDetailView,
+    RegistrationDownloadView,
     RegistrationsView,
 )
 
@@ -18,6 +19,7 @@ urlpatterns = [
     path("me/", MeView.as_view()),
     path("registrations/", RegistrationsView.as_view()),
     path("registrations/<int:pk>/", RegistrationDetailView.as_view()),
+    path("registrations/<int:pk>/download/", RegistrationDownloadView.as_view()),
     path("my-registrations/", MyRegistrationsView.as_view()),
     path("legal-representatives/", LegalRepresentativesView.as_view()),
     path("co-representative/", CoRepresentativeView.as_view()),

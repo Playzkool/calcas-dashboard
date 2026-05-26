@@ -1,6 +1,10 @@
+import io
+import unicodedata
+import zipfile
 from datetime import date
 
 from django.contrib.auth import authenticate, login, logout
+from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
@@ -8,6 +12,8 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from rest_api.html_export import generate_registration_html
 
 from registration.models import (
     LegalRepresentative,
@@ -82,7 +88,14 @@ class RegistrationsView(APIView):
         campaign = RegistrationCampaign.objects.filter(year__year=today.year).first()
         if not campaign:
             return Response([])
-        qs = RegistrationFile.objects.filter(campaign=campaign).select_related("pupil")
+        qs = (
+            RegistrationFile.objects
+            .filter(campaign=campaign)
+            .select_related("pupil")
+            .prefetch_related(
+                "pupil__pupillegalrepresentative_set__legal_representative"
+            )
+        )
         serializer = RegistrationListItemSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
 
@@ -210,8 +223,100 @@ class RegistrationDetailView(APIView):
         if not RegistrationSupervisor.objects.filter(user=request.user).exists():
             return Response({"detail": "Réservé aux gestionnaires."}, status=status.HTTP_403_FORBIDDEN)
         try:
-            registration = RegistrationFile.objects.select_related("pupil").get(pk=pk)
+            registration = (
+                RegistrationFile.objects
+                .select_related("pupil")
+                .prefetch_related(
+                    "pupil__pupillegalrepresentative_set__legal_representative__user"
+                )
+                .get(pk=pk)
+            )
         except RegistrationFile.DoesNotExist:
             return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
         serializer = RegistrationDetailSerializer(registration, context={"request": request})
         return Response(serializer.data)
+
+
+def _ascii_filename(name: str) -> str:
+    """Normalize a string to ASCII for use in filenames."""
+    normalized = unicodedata.normalize("NFKD", name)
+    ascii_str = normalized.encode("ascii", "ignore").decode("ascii")
+    return "".join(c if (c.isalnum() or c in "-_.") else "_" for c in ascii_str).strip("_")
+
+
+class RegistrationDownloadView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (SessionAuthentication,)
+
+    def get(self, request, pk):
+        if not RegistrationSupervisor.objects.filter(user=request.user).exists():
+            return Response({"detail": "Réservé aux gestionnaires."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            reg = (
+                RegistrationFile.objects
+                .select_related("pupil")
+                .prefetch_related(
+                    "pupil__pupillegalrepresentative_set__legal_representative__user"
+                )
+                .get(pk=pk)
+            )
+        except RegistrationFile.DoesNotExist:
+            return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Compute completion for the HTML recap
+        from rest_api.serializers import RegistrationListItemSerializer
+        tmp_serializer = RegistrationListItemSerializer(reg, context={"request": request})
+        completion_pct = tmp_serializer.data.get("completion_pct", 0)
+
+        # Build ZIP in memory
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            # HTML recap
+            html_content = generate_registration_html(reg, completion_pct)
+            zf.writestr("recap.html", html_content.encode("utf-8"))
+
+            # Registration documents
+            doc_slots = [
+                ("document",             "certificat_naissance"),
+                ("vaccination_document", "carnet_sante"),
+                ("insurance_document",   "attestation_assurance"),
+                ("divorce_judgment",     "jugement_divorce"),
+            ]
+            for field_name, base_name in doc_slots:
+                file_field = getattr(reg, field_name)
+                if not file_field:
+                    continue
+                ext = file_field.name.rsplit(".", 1)[-1] if "." in file_field.name else "bin"
+                zip_name = f"documents/{base_name}.{ext}"
+                try:
+                    with file_field.open("rb") as f:
+                        zf.writestr(zip_name, f.read())
+                except Exception:
+                    pass
+
+            # Legal representative pool attestations
+            plrs = reg.pupil.pupillegalrepresentative_set.all()
+            for plr in plrs:
+                lr = plr.legal_representative
+                if not lr.pool_attestation:
+                    continue
+                lr_slug = _ascii_filename(
+                    f"{lr.firstname or ''}_{lr.lastname or lr.user.email}"
+                ).lower()
+                ext = lr.pool_attestation.name.rsplit(".", 1)[-1] if "." in lr.pool_attestation.name else "bin"
+                zip_name = f"documents/attestation_piscine_{lr_slug}.{ext}"
+                try:
+                    with lr.pool_attestation.open("rb") as f:
+                        zf.writestr(zip_name, f.read())
+                except Exception:
+                    pass
+
+        buffer.seek(0)
+        pupil_slug = _ascii_filename(
+            f"{reg.pupil.firstname}_{reg.pupil.lastname}"
+        ).lower()
+        zip_filename = f"dossier_{pupil_slug}.zip"
+
+        response = HttpResponse(buffer.read(), content_type="application/zip")
+        response["Content-Disposition"] = f'attachment; filename="{zip_filename}"'
+        return response

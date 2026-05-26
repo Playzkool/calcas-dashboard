@@ -3,6 +3,8 @@ import {
     Alert,
     Box,
     CircularProgress,
+    IconButton,
+    LinearProgress,
     Paper,
     Table,
     TableBody,
@@ -13,9 +15,37 @@ import {
     Tooltip,
     Typography,
 } from "@mui/material";
+import DownloadIcon from "@mui/icons-material/Download";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { fetchRegistrations } from "../store/registrations-list-slice";
 import { RegistrationDetailView } from "./registration-detail";
+
+// ─── Completion badge ─────────────────────────────────────────────────────────
+
+function CompletionCell({ pct }: { pct: number }) {
+    const color =
+        pct >= 80 ? "success" :
+        pct >= 50 ? "warning" :
+        "error";
+
+    return (
+        <Box sx={{ minWidth: 100 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                    {pct} %
+                </Typography>
+            </Box>
+            <LinearProgress
+                variant="determinate"
+                value={pct}
+                color={color}
+                sx={{ height: 6, borderRadius: 3 }}
+            />
+        </Box>
+    );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function RegistrationsList() {
     const dispatch = useAppDispatch();
@@ -26,7 +56,7 @@ export function RegistrationsList() {
         if (status === "idle") dispatch(fetchRegistrations());
     }, [dispatch, status]);
 
-    // Si un item est sélectionné, afficher la vue détail
+    // Vue détail
     if (selectedId !== null) {
         return (
             <RegistrationDetailView
@@ -64,12 +94,17 @@ export function RegistrationsList() {
                                 <TableCell>Nom</TableCell>
                                 <TableCell>Date de naissance</TableCell>
                                 <TableCell>Niveau</TableCell>
-                                <TableCell>Document</TableCell>
+                                <TableCell>Complétion</TableCell>
+                                <TableCell align="center">Dossier</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {items.map((item) => (
-                                <Tooltip title="Voir le dossier complet" key={item.id} placement="left">
+                                <Tooltip
+                                    key={item.id}
+                                    title="Cliquer pour voir le dossier complet"
+                                    placement="left"
+                                >
                                     <TableRow
                                         hover
                                         onClick={() => setSelectedId(item.id)}
@@ -79,14 +114,24 @@ export function RegistrationsList() {
                                         <TableCell>{item.lastname}</TableCell>
                                         <TableCell>{item.birth_date}</TableCell>
                                         <TableCell>{item.grade_label}</TableCell>
-                                        <TableCell onClick={(e) => e.stopPropagation()}>
-                                            {item.document_url ? (
-                                                <a href={item.document_url} target="_blank" rel="noreferrer">
-                                                    Voir
-                                                </a>
-                                            ) : (
-                                                "—"
-                                            )}
+                                        <TableCell sx={{ minWidth: 130 }}>
+                                            <CompletionCell pct={item.completion_pct} />
+                                        </TableCell>
+                                        <TableCell
+                                            align="center"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Tooltip title="Télécharger le dossier (.zip)">
+                                                <IconButton
+                                                    size="small"
+                                                    component="a"
+                                                    href={`/api/registrations/${item.id}/download/`}
+                                                    download
+                                                    color="primary"
+                                                >
+                                                    <DownloadIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
                                         </TableCell>
                                     </TableRow>
                                 </Tooltip>

@@ -7,7 +7,7 @@ export interface RegistrationListItem {
     birth_date: string;
     grade: number;
     grade_label: string;
-    document_url: string | null;
+    completion_pct: number;
 }
 
 export const fetchRegistrations = createAsyncThunk(
