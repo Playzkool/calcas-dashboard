@@ -28,6 +28,7 @@ from rest_api.serializers import (
     LegalRepresentativeProfileSerializer,
     RegistrationDetailSerializer,
     RegistrationFileCreateSerializer,
+    RegistrationFileUpdateSerializer,
     RegistrationListItemSerializer,
 )
 
@@ -118,7 +119,12 @@ class MyRegistrationsView(APIView):
         if not lr:
             return Response({"detail": "Réservé aux représentants légaux."}, status=status.HTTP_403_FORBIDDEN)
         pupil_ids = PupilLegalRepresentative.objects.filter(legal_representative=lr).values_list("pupil_id", flat=True)
-        qs = RegistrationFile.objects.filter(pupil_id__in=pupil_ids).select_related("pupil")
+        qs = (
+            RegistrationFile.objects
+            .filter(pupil_id__in=pupil_ids)
+            .select_related("pupil")
+            .prefetch_related("pupil__pupillegalrepresentative_set__legal_representative")
+        )
         serializer = RegistrationListItemSerializer(qs, many=True, context={"request": request})
         return Response(serializer.data)
 
@@ -218,23 +224,72 @@ class LegalRepresentativesView(APIView):
 class RegistrationDetailView(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (SessionAuthentication,)
+    parser_classes = (MultiPartParser, JSONParser)
 
-    def get(self, request, pk):
-        if not RegistrationSupervisor.objects.filter(user=request.user).exists():
-            return Response({"detail": "Réservé aux gestionnaires."}, status=status.HTTP_403_FORBIDDEN)
+    def _get_lr_registration(self, user, pk):
+        """Return the RegistrationFile if it belongs to the requesting LR, else None."""
+        lr = LegalRepresentative.objects.filter(user=user).first()
+        if not lr:
+            return None
+        pupil_ids = PupilLegalRepresentative.objects.filter(
+            legal_representative=lr
+        ).values_list("pupil_id", flat=True)
         try:
-            registration = (
+            return (
                 RegistrationFile.objects
                 .select_related("pupil")
-                .prefetch_related(
-                    "pupil__pupillegalrepresentative_set__legal_representative__user"
-                )
-                .get(pk=pk)
+                .prefetch_related("pupil__pupillegalrepresentative_set__legal_representative__user")
+                .get(pk=pk, pupil_id__in=pupil_ids)
             )
         except RegistrationFile.DoesNotExist:
-            return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return None
+
+    def get(self, request, pk):
+        if RegistrationSupervisor.objects.filter(user=request.user).exists():
+            try:
+                registration = (
+                    RegistrationFile.objects
+                    .select_related("pupil")
+                    .prefetch_related("pupil__pupillegalrepresentative_set__legal_representative__user")
+                    .get(pk=pk)
+                )
+            except RegistrationFile.DoesNotExist:
+                return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            registration = self._get_lr_registration(request.user, pk)
+            if registration is None:
+                return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = RegistrationDetailSerializer(registration, context={"request": request})
         return Response(serializer.data)
+
+    def patch(self, request, pk):
+        # Supervisors can toggle is_closed
+        if RegistrationSupervisor.objects.filter(user=request.user).exists():
+            try:
+                registration = RegistrationFile.objects.get(pk=pk)
+            except RegistrationFile.DoesNotExist:
+                return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            is_closed = request.data.get("is_closed")
+            if is_closed is None:
+                return Response({"detail": "is_closed est requis."}, status=status.HTTP_400_BAD_REQUEST)
+            registration.is_closed = bool(is_closed)
+            registration.save(update_fields=["is_closed"])
+            return Response({"id": registration.id, "is_closed": registration.is_closed})
+
+        # Legal representatives can edit their own non-closed registration
+        registration = self._get_lr_registration(request.user, pk)
+        if registration is None:
+            return Response({"detail": "Dossier introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        if registration.is_closed:
+            return Response(
+                {"detail": "Ce dossier est clôturé et ne peut plus être modifié."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = RegistrationFileUpdateSerializer(registration, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"id": registration.id})
 
 
 def _ascii_filename(name: str) -> str:

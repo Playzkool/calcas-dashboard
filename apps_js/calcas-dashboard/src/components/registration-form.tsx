@@ -33,7 +33,7 @@ import {
 } from "../types.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "../hooks";
-import { resetRegistration, submitRegistration } from "../store/registration-slice";
+import { resetRegistration, resetUpdateRegistration, submitRegistration, updateRegistration } from "../store/registration-slice";
 
 const GRADES: { label: string; value: number }[] = [
     { label: "Petite section", value: 1 },
@@ -59,13 +59,26 @@ const DISEASES = [
     { key: "varicelle", label: "Varicelle" },
 ] as const;
 
-const defaultValues = {
+const emptyDefaults = {
     firstname: "",
     lastname: "",
     diseases_history: {} as Record<string, boolean>,
     emergency_contacts: [] as { name: string; phone: string; relation?: string }[],
     authorized_pickup_persons: [] as { name: string; relation?: string; phone?: string; address?: string }[],
 } satisfies Partial<RegistrationFormInputType>;
+
+export interface DocumentUrls {
+    document?: string | null;
+    vaccination_document?: string | null;
+    insurance_document?: string | null;
+    divorce_judgment?: string | null;
+}
+
+interface RegistrationFormProps {
+    registrationId?: number;
+    initialData?: Partial<RegistrationFormInputType>;
+    documentUrls?: DocumentUrls;
+}
 
 function FileUploadButton({
     label,
@@ -74,6 +87,7 @@ function FileUploadButton({
     onChange,
     error,
     helperText,
+    currentUrl,
 }: {
     label: string;
     accept?: string;
@@ -81,26 +95,47 @@ function FileUploadButton({
     onChange: (f: File | undefined) => void;
     error?: boolean;
     helperText?: string;
+    currentUrl?: string | null;
 }) {
     return (
         <FormControl error={error}>
-            <Button variant="outlined" component="label" size="small">
-                {value ? value.name : label}
-                <input
-                    type="file"
-                    accept={accept ?? "application/pdf,image/*"}
-                    hidden
-                    onChange={(e) => onChange(e.target.files?.[0])}
-                />
-            </Button>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Button variant="outlined" component="label" size="small">
+                    {value ? value.name : label}
+                    <input
+                        type="file"
+                        accept={accept ?? "application/pdf,image/*"}
+                        hidden
+                        onChange={(e) => onChange(e.target.files?.[0])}
+                    />
+                </Button>
+                {!value && currentUrl && (
+                    <Typography variant="caption">
+                        <a href={currentUrl} target="_blank" rel="noreferrer">
+                            Voir le fichier actuel
+                        </a>
+                    </Typography>
+                )}
+            </Stack>
             {helperText && <FormHelperText>{helperText}</FormHelperText>}
         </FormControl>
     );
 }
 
-export function RegistrationForm() {
+export function RegistrationForm({ registrationId, initialData, documentUrls }: RegistrationFormProps = {}) {
     const dispatch = useAppDispatch();
-    const { status, error } = useAppSelector((state) => state.registration);
+    const createStatus = useAppSelector((state) => state.registration.status);
+    const createError = useAppSelector((state) => state.registration.error);
+    const updateStatus = useAppSelector((state) => state.registration.updateStatus);
+    const updateError = useAppSelector((state) => state.registration.updateError);
+
+    const isEditMode = registrationId !== undefined;
+    const status = isEditMode ? updateStatus : createStatus;
+    const error = isEditMode ? updateError : createError;
+
+    const defaultValues = initialData
+        ? { ...emptyDefaults, ...initialData }
+        : emptyDefaults;
 
     const {
         control,
@@ -122,13 +157,26 @@ export function RegistrationForm() {
     const familySituation = watch("family_situation");
 
     const onSubmit = (data: RegistrationFormType) => {
-        dispatch(submitRegistration(data));
+        if (isEditMode) {
+            dispatch(updateRegistration({ id: registrationId, data }));
+        } else {
+            dispatch(submitRegistration(data));
+        }
+    };
+
+    const handleDismissSuccess = () => {
+        if (isEditMode) {
+            dispatch(resetUpdateRegistration());
+        } else {
+            dispatch(resetRegistration());
+            reset(emptyDefaults);
+        }
     };
 
     return (
         <Box maxWidth={700} mx="auto" mt={4}>
             <Typography variant="h5" mb={3}>
-                Inscription – Dossier de marcatge
+                {isEditMode ? "Modifier le dossier d'inscription" : "Inscription – Dossier de marcatge"}
             </Typography>
 
             <form onSubmit={handleSubmit(onSubmit)}>
@@ -635,7 +683,7 @@ export function RegistrationForm() {
                         <AccordionDetails>
                             <Stack spacing={2}>
                                 <Typography variant="caption" color="text.secondary">
-                                    Formats acceptés : PDF ou image (JPG, PNG).
+                                    Formats acceptés : PDF ou image (JPG, PNG). Laissez vide pour conserver le fichier existant.
                                 </Typography>
 
                                 <Controller
@@ -648,6 +696,7 @@ export function RegistrationForm() {
                                             onChange={onChange}
                                             error={!!errors.vaccination_document}
                                             helperText={errors.vaccination_document?.message as string}
+                                            currentUrl={documentUrls?.vaccination_document}
                                         />
                                     )}
                                 />
@@ -662,6 +711,7 @@ export function RegistrationForm() {
                                             onChange={onChange}
                                             error={!!errors.insurance_document}
                                             helperText={errors.insurance_document?.message as string}
+                                            currentUrl={documentUrls?.insurance_document}
                                         />
                                     )}
                                 />
@@ -677,6 +727,7 @@ export function RegistrationForm() {
                                                 onChange={onChange}
                                                 error={!!errors.divorce_judgment}
                                                 helperText={errors.divorce_judgment?.message as string}
+                                                currentUrl={documentUrls?.divorce_judgment}
                                             />
                                         )}
                                     />
@@ -692,6 +743,7 @@ export function RegistrationForm() {
                                             onChange={onChange}
                                             error={!!errors.document}
                                             helperText={errors.document?.message as string}
+                                            currentUrl={documentUrls?.document}
                                         />
                                     )}
                                 />
@@ -743,22 +795,22 @@ export function RegistrationForm() {
                             ) : null
                         }
                     >
-                        {status === "loading" ? "Envoi en cours…" : "Envoyer le dossier"}
+                        {status === "loading"
+                            ? "Envoi en cours…"
+                            : isEditMode
+                                ? "Enregistrer les modifications"
+                                : "Envoyer le dossier"}
                     </Button>
 
                     {status === "succeeded" && (
-                        <Alert
-                            severity="success"
-                            onClose={() => {
-                                dispatch(resetRegistration());
-                                reset(defaultValues);
-                            }}
-                        >
-                            Dossier envoyé avec succès.
+                        <Alert severity="success" onClose={handleDismissSuccess}>
+                            {isEditMode
+                                ? "Dossier mis à jour avec succès."
+                                : "Dossier envoyé avec succès."}
                         </Alert>
                     )}
                     {status === "failed" && (
-                        <Alert severity="error" onClose={() => dispatch(resetRegistration())}>
+                        <Alert severity="error" onClose={handleDismissSuccess}>
                             {error ?? "Une erreur est survenue."}
                         </Alert>
                     )}

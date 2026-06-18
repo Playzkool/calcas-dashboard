@@ -75,6 +75,8 @@ class RegistrationDetailSerializer(serializers.ModelSerializer):
             "authorized_pickup_persons",
             # Charte
             "charter_accepted",
+            # Statut
+            "is_closed",
             # Legal representatives
             "legal_representatives",
         ]
@@ -213,13 +215,23 @@ class RegistrationListItemSerializer(serializers.ModelSerializer):
     grade = serializers.IntegerField(source="pupil.grade")
     grade_label = serializers.SerializerMethodField()
     completion_pct = serializers.SerializerMethodField()
+    document_url = serializers.SerializerMethodField()
 
     class Meta:
         model = RegistrationFile
-        fields = ["id", "firstname", "lastname", "birth_date", "grade", "grade_label", "completion_pct"]
+        fields = [
+            "id", "firstname", "lastname", "birth_date", "grade", "grade_label",
+            "completion_pct", "document_url", "is_closed",
+        ]
 
     def get_grade_label(self, obj):
         return obj.pupil.get_grade_display()
+
+    def get_document_url(self, obj):
+        if not obj.document:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.document.url) if request else obj.document.url
 
     def get_completion_pct(self, obj):
         """
@@ -259,6 +271,72 @@ class RegistrationListItemSerializer(serializers.ModelSerializer):
             ),
         ]
         return round(sum(criteria) * 100 / len(criteria))
+
+
+class RegistrationFileUpdateSerializer(serializers.Serializer):
+    # Pupil info (all optional for PATCH)
+    firstname = serializers.CharField(max_length=100, required=False)
+    lastname = serializers.CharField(max_length=100, required=False)
+    birth_date = serializers.DateField(required=False)
+    birth_place = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    postal_code = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    nationality = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    grade = serializers.IntegerField(required=False)
+    family_situation = serializers.ChoiceField(
+        choices=["married_or_cohabiting", "divorced_or_separated", "single_parent"],
+        required=False, allow_null=True,
+    )
+    siblings_brothers = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    siblings_sisters = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+
+    # Documents
+    document = serializers.FileField(required=False, allow_null=True)
+    vaccination_document = serializers.FileField(required=False, allow_null=True)
+    insurance_document = serializers.FileField(required=False, allow_null=True)
+    divorce_judgment = serializers.FileField(required=False, allow_null=True)
+
+    # Fiche sanitaire
+    other_vaccines = serializers.CharField(required=False, allow_blank=True)
+    diseases_history = serializers.JSONField(required=False)
+    samu_authorized = serializers.BooleanField(required=False, allow_null=True)
+    emergency_contacts = serializers.JSONField(required=False)
+    allergies_info = serializers.CharField(required=False, allow_blank=True)
+
+    # Autorisations
+    school_trips_authorized = serializers.BooleanField(required=False, allow_null=True)
+    doctor_name_phone = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    image_rights_authorized = serializers.BooleanField(required=False, allow_null=True)
+    authorized_pickup_persons = serializers.JSONField(required=False)
+
+    # Charte
+    charter_accepted = serializers.BooleanField(required=False)
+
+    def validate_grade(self, value):
+        valid = [g.value for g in Grade]
+        if value not in valid:
+            raise serializers.ValidationError(f"Grade invalide. Valeurs acceptées : {valid}")
+        return value
+
+    def update(self, instance, validated_data):
+        pupil_fields = [
+            "firstname", "lastname", "birth_date", "birth_place", "postal_code",
+            "nationality", "address", "grade", "family_situation",
+            "siblings_brothers", "siblings_sisters",
+        ]
+        pupil = instance.pupil
+        pupil_dirty = False
+        for field in pupil_fields:
+            if field in validated_data:
+                setattr(pupil, field, validated_data.pop(field))
+                pupil_dirty = True
+        if pupil_dirty:
+            pupil.save()
+
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+        return instance
 
 
 class LegalRepresentativeListItemSerializer(serializers.ModelSerializer):

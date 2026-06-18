@@ -8,6 +8,8 @@ export interface MyRegistrationItem {
     grade: number;
     grade_label: string;
     document_url: string | null;
+    completion_pct: number;
+    is_closed: boolean;
 }
 
 export const fetchMyRegistrations = createAsyncThunk(

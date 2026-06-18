@@ -17,37 +17,49 @@ const JSON_FIELDS: (keyof RegistrationFormType)[] = [
     "authorized_pickup_persons",
 ];
 
+function buildFormData(data: RegistrationFormType): FormData {
+    const body = new FormData();
+    for (const [key, value] of Object.entries(data) as [keyof RegistrationFormType, unknown][]) {
+        if (value === undefined || value === null) continue;
+        if (FILE_FIELDS.includes(key)) {
+            body.append(key, value as File);
+        } else if (JSON_FIELDS.includes(key)) {
+            body.append(key, JSON.stringify(value));
+        } else if (key === "birth_date" && value instanceof Date) {
+            body.append(key, value.toISOString().split("T")[0]);
+        } else if (typeof value === "boolean") {
+            body.append(key, value ? "true" : "false");
+        } else {
+            body.append(key, String(value));
+        }
+    }
+    return body;
+}
+
 export const submitRegistration = createAsyncThunk(
     "registration/submit",
     async (data: RegistrationFormType, { rejectWithValue }) => {
-        const body = new FormData();
-
-        for (const [key, value] of Object.entries(data) as [keyof RegistrationFormType, unknown][]) {
-            if (value === undefined || value === null) continue;
-
-            if (FILE_FIELDS.includes(key)) {
-                body.append(key, value as File);
-            } else if (JSON_FIELDS.includes(key)) {
-                body.append(key, JSON.stringify(value));
-            } else if (key === "birth_date" && value instanceof Date) {
-                body.append(key, value.toISOString().split("T")[0]);
-            } else if (typeof value === "boolean") {
-                body.append(key, value ? "true" : "false");
-            } else {
-                body.append(key, String(value));
-            }
-        }
-
         const res = await fetch(`${API_BASE}/api/registrations/`, {
             method: "POST",
             headers: { "X-CSRFToken": getCsrfToken() },
             credentials: "include",
-            body,
+            body: buildFormData(data),
         });
+        if (!res.ok) return rejectWithValue(await res.text());
+        return res.json();
+    }
+);
 
-        if (!res.ok) {
-            return rejectWithValue(await res.text());
-        }
+export const updateRegistration = createAsyncThunk(
+    "registration/update",
+    async ({ id, data }: { id: number; data: RegistrationFormType }, { rejectWithValue }) => {
+        const res = await fetch(`${API_BASE}/api/registrations/${id}/`, {
+            method: "PATCH",
+            headers: { "X-CSRFToken": getCsrfToken() },
+            credentials: "include",
+            body: buildFormData(data),
+        });
+        if (!res.ok) return rejectWithValue(await res.text());
         return res.json();
     }
 );
@@ -55,11 +67,15 @@ export const submitRegistration = createAsyncThunk(
 interface RegistrationState {
     status: "idle" | "loading" | "succeeded" | "failed";
     error: string | null;
+    updateStatus: "idle" | "loading" | "succeeded" | "failed";
+    updateError: string | null;
 }
 
 const initialState: RegistrationState = {
     status: "idle",
     error: null,
+    updateStatus: "idle",
+    updateError: null,
 };
 
 const registrationSlice = createSlice({
@@ -69,6 +85,10 @@ const registrationSlice = createSlice({
         resetRegistration(state) {
             state.status = "idle";
             state.error = null;
+        },
+        resetUpdateRegistration(state) {
+            state.updateStatus = "idle";
+            state.updateError = null;
         },
     },
     extraReducers: (builder) => {
@@ -83,9 +103,20 @@ const registrationSlice = createSlice({
             .addCase(submitRegistration.rejected, (state, action) => {
                 state.status = "failed";
                 state.error = (action.payload as string) ?? action.error.message ?? "Erreur inconnue";
+            })
+            .addCase(updateRegistration.pending, (state) => {
+                state.updateStatus = "loading";
+                state.updateError = null;
+            })
+            .addCase(updateRegistration.fulfilled, (state) => {
+                state.updateStatus = "succeeded";
+            })
+            .addCase(updateRegistration.rejected, (state, action) => {
+                state.updateStatus = "failed";
+                state.updateError = (action.payload as string) ?? action.error.message ?? "Erreur inconnue";
             });
     },
 });
 
-export const { resetRegistration } = registrationSlice.actions;
+export const { resetRegistration, resetUpdateRegistration } = registrationSlice.actions;
 export default registrationSlice.reducer;

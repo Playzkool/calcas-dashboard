@@ -163,6 +163,12 @@ class RegistrationFile(models.Model):
         default=False
     )
 
+    # Clôture du dossier (empêche toute modification par le parent)
+    is_closed = models.BooleanField(
+        verbose_name="Dossier clôturé",
+        default=False
+    )
+
     class Meta:
         app_label = "registration"
         verbose_name = "Dossier d'inscription"

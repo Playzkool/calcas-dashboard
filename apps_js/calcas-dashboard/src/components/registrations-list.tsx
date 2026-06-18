@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
     Alert,
     Box,
+    Chip,
     CircularProgress,
     IconButton,
     LinearProgress,
@@ -95,6 +96,7 @@ export function RegistrationsList() {
                                 <TableCell>Date de naissance</TableCell>
                                 <TableCell>Niveau</TableCell>
                                 <TableCell>Complétion</TableCell>
+                                <TableCell>Statut</TableCell>
                                 <TableCell align="center">Dossier</TableCell>
                             </TableRow>
                         </TableHead>
@@ -116,6 +118,12 @@ export function RegistrationsList() {
                                         <TableCell>{item.grade_label}</TableCell>
                                         <TableCell sx={{ minWidth: 130 }}>
                                             <CompletionCell pct={item.completion_pct} />
+                                        </TableCell>
+                                        <TableCell>
+                                            {item.is_closed
+                                                ? <Chip label="Clôturé" size="small" color="default" />
+                                                : <Chip label="En cours" size="small" color="success" variant="outlined" />
+                                            }
                                         </TableCell>
                                         <TableCell
                                             align="center"

@@ -8,6 +8,7 @@ export interface RegistrationListItem {
     grade: number;
     grade_label: string;
     completion_pct: number;
+    is_closed: boolean;
 }
 
 export const fetchRegistrations = createAsyncThunk(
@@ -34,7 +35,13 @@ const initialState: RegistrationsListState = {
 const registrationsListSlice = createSlice({
     name: "registrationsList",
     initialState,
-    reducers: {},
+    reducers: {
+        resetRegistrationsList(state) {
+            state.status = "idle";
+            state.items = [];
+            state.error = null;
+        },
+    },
     extraReducers: (builder) => {
         builder
             .addCase(fetchRegistrations.pending, (state) => { state.status = "loading"; })
@@ -49,4 +56,5 @@ const registrationsListSlice = createSlice({
     },
 });
 
+export const { resetRegistrationsList } = registrationsListSlice.actions;
 export default registrationsListSlice.reducer;

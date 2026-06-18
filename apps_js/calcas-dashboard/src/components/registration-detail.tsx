@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
     Alert,
     Box,
@@ -7,6 +7,11 @@ import {
     CardContent,
     Chip,
     CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
     Divider,
     Grid,
     Link,
@@ -16,10 +21,13 @@ import {
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import LockIcon from "@mui/icons-material/Lock";
+import LockOpenIcon from "@mui/icons-material/LockOpen";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import { useAppDispatch, useAppSelector } from "../hooks";
-import { clearDetail, fetchRegistrationDetail } from "../store/registration-detail-slice";
+import { clearDetail, fetchRegistrationDetail, resetToggle, toggleRegistrationClosed } from "../store/registration-detail-slice";
+import { resetRegistrationsList } from "../store/registrations-list-slice";
 import type { LegalRepresentativeDetail } from "../types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -182,12 +190,22 @@ interface RegistrationDetailViewProps {
 
 export function RegistrationDetailView({ id, onBack }: RegistrationDetailViewProps) {
     const dispatch = useAppDispatch();
-    const { data, status, error } = useAppSelector((s) => s.registrationDetail);
+    const { data, status, error, toggleStatus, toggleError } = useAppSelector((s) => s.registrationDetail);
+    const [confirmOpen, setConfirmOpen] = useState(false);
 
     useEffect(() => {
         dispatch(fetchRegistrationDetail(id));
         return () => { dispatch(clearDetail()); };
     }, [dispatch, id]);
+
+    const handleToggleClose = () => setConfirmOpen(true);
+
+    const handleConfirmToggle = () => {
+        if (!data) return;
+        dispatch(toggleRegistrationClosed({ id: data.id, is_closed: !data.is_closed }));
+        dispatch(resetRegistrationsList());
+        setConfirmOpen(false);
+    };
 
     if (status === "idle" || status === "loading") {
         return (
@@ -206,15 +224,73 @@ export function RegistrationDetailView({ id, onBack }: RegistrationDetailViewPro
     return (
         <Box>
             {/* Header */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
                 <Button startIcon={<ArrowBackIcon />} onClick={onBack} variant="outlined" size="small">
                     Retour
                 </Button>
-                <Typography variant="h5">
+                <Typography variant="h5" sx={{ flex: 1 }}>
                     {data.firstname} {data.lastname}
                 </Typography>
                 <Chip label={data.grade_label} color="primary" size="small" />
+                <Chip
+                    label={data.is_closed ? "Clôturé" : "En cours"}
+                    color={data.is_closed ? "default" : "success"}
+                    size="small"
+                    variant="outlined"
+                />
+                <Button
+                    variant={data.is_closed ? "outlined" : "contained"}
+                    color={data.is_closed ? "inherit" : "warning"}
+                    size="small"
+                    startIcon={
+                        toggleStatus === "loading"
+                            ? <CircularProgress size={14} color="inherit" />
+                            : data.is_closed
+                                ? <LockOpenIcon fontSize="small" />
+                                : <LockIcon fontSize="small" />
+                    }
+                    disabled={toggleStatus === "loading"}
+                    onClick={handleToggleClose}
+                >
+                    {data.is_closed ? "Rouvrir le dossier" : "Clôturer le dossier"}
+                </Button>
             </Box>
+
+            {toggleStatus === "failed" && (
+                <Alert severity="error" onClose={() => dispatch(resetToggle())} sx={{ mb: 2 }}>
+                    {toggleError ?? "Erreur lors de la mise à jour du statut."}
+                </Alert>
+            )}
+            {toggleStatus === "succeeded" && (
+                <Alert severity="success" onClose={() => dispatch(resetToggle())} sx={{ mb: 2 }}>
+                    Statut mis à jour.
+                </Alert>
+            )}
+
+            {/* Confirmation dialog */}
+            <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+                <DialogTitle>
+                    {data.is_closed ? "Rouvrir le dossier ?" : "Clôturer le dossier ?"}
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {data.is_closed
+                            ? `Le dossier de ${data.firstname} ${data.lastname} sera rouvert. Le représentant légal pourra de nouveau le modifier.`
+                            : `Le dossier de ${data.firstname} ${data.lastname} sera clôturé. Le représentant légal ne pourra plus le modifier.`}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConfirmOpen(false)}>Annuler</Button>
+                    <Button
+                        onClick={handleConfirmToggle}
+                        variant="contained"
+                        color={data.is_closed ? "primary" : "warning"}
+                        autoFocus
+                    >
+                        Confirmer
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Stack spacing={3}>
                 {/* ── Informations de l'élève ── */}

@@ -181,6 +181,8 @@ export interface RegistrationDetail {
     }>
     // Charte
     charter_accepted: boolean
+    // Statut
+    is_closed: boolean
     // Représentants légaux
     legal_representatives: LegalRepresentativeDetail[]
 }
