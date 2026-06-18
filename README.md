@@ -7,14 +7,43 @@ Tableau de bord de gestion des inscriptions scolaires.
 
 ---
 
-## Prérequis
+## Démarrage rapide (Docker — recommandé)
 
-- Python 3.12+
-- Node.js 20+
+### Prérequis
+
+- Docker Desktop 4.x+
+
+### Lancement
+
+```bash
+cp .env.example .env
+# Éditer .env : POSTGRES_PASSWORD et SECRET_KEY (voir ci-dessous)
+docker compose up --build
+```
+
+L'application est accessible sur **`http://localhost`**.
+
+### Générer une SECRET_KEY sécurisée
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(50))"
+```
+
+### Données de démonstration
+
+```bash
+docker compose exec backend python manage.py generate_demo_data
+```
 
 ---
 
-## Installation
+## Développement local (sans Docker)
+
+### Prérequis
+
+- Python 3.12+
+- Node.js 20+
+- PostgreSQL 16+ (ou Docker pour la BDD uniquement)
 
 ### Backend
 
@@ -23,31 +52,30 @@ cd calcas-dashboard          # racine du projet Django
 python -m venv .venv
 source .venv/bin/activate    # Windows : .venv\Scripts\activate
 pip install -r requirements.txt
+
+# Variables d'environnement requises
+export SECRET_KEY="dev-secret-key"
+export DEBUG=True
+export ALLOWED_HOSTS=localhost,127.0.0.1
+export POSTGRES_DB=calcas
+export POSTGRES_USER=calcas
+export POSTGRES_PASSWORD=calcas
+export POSTGRES_HOST=localhost
+
 python manage.py migrate
+python manage.py runserver
 ```
+
+> **Astuce** : lancer uniquement PostgreSQL dans Docker pour le dev local :
+> ```bash
+> docker compose up db
+> ```
 
 ### Frontend
 
 ```bash
 cd apps_js/calcas-dashboard
 npm install
-```
-
----
-
-## Lancer en développement
-
-### Backend (port 8000)
-
-```bash
-source .venv/bin/activate
-python manage.py runserver
-```
-
-### Frontend (port 5173)
-
-```bash
-cd apps_js/calcas-dashboard
 npm run dev
 ```
 
@@ -56,11 +84,33 @@ proxifiés automatiquement vers Django (`http://127.0.0.1:8000`).
 
 ---
 
+## Variables d'environnement
+
+Le fichier `.env` (à créer depuis `.env.example`) est lu par `docker compose`.
+
+| Variable | Description | Exemple |
+|---|---|---|
+| `POSTGRES_DB` | Nom de la base | `calcas` |
+| `POSTGRES_USER` | Utilisateur PostgreSQL | `calcas` |
+| `POSTGRES_PASSWORD` | Mot de passe PostgreSQL | `change_me` |
+| `POSTGRES_HOST` | Hôte PostgreSQL | `db` (Docker) / `localhost` (local) |
+| `POSTGRES_PORT` | Port PostgreSQL | `5432` |
+| `SECRET_KEY` | Clé secrète Django | chaîne aléatoire de 50+ caractères |
+| `DEBUG` | Mode debug | `False` (prod) / `True` (dev) |
+| `ALLOWED_HOSTS` | Hôtes autorisés (virgule) | `localhost,127.0.0.1` |
+| `CSRF_TRUSTED_ORIGINS` | Origines CSRF (virgule) | `http://localhost` |
+
+---
+
 ## Données de démonstration
 
 ### Générer les données
 
 ```bash
+# Docker
+docker compose exec backend python manage.py generate_demo_data
+
+# Local
 python manage.py generate_demo_data
 ```
 
@@ -74,6 +124,10 @@ Crée :
 ### Supprimer toutes les données
 
 ```bash
+# Docker
+docker compose exec backend python manage.py 0_wipe_data
+
+# Local
 python manage.py 0_wipe_data
 ```
 
@@ -88,8 +142,7 @@ python manage.py 0_wipe_data
 | Représentant légal | `jean.martin_demo` | `TestParent123` |
 
 Tous les comptes représentants légaux partagent le mot de passe `TestParent123`.
-La liste complète des comptes créés est visible dans
-`registration/management/commands/generate_demo_data.py`.
+La liste complète est visible dans `registration/management/commands/generate_demo_data.py`.
 
 ---
 
@@ -107,24 +160,27 @@ La liste complète des comptes créés est visible dans
 ### Représentant légal
 
 - **Dépôt d'un dossier d'inscription** : formulaire multi-sections (informations de l'élève, situation familiale, fiche sanitaire, autorisations, documents joints, charte).
+- **Modification d'un dossier** : tant que le dossier n'est pas clôturé par le gestionnaire, le représentant peut le modifier. Une jauge de complétion indique l'avancement.
+- **Consultation d'un dossier clôturé** : vue lecture seule du dossier complet.
 - **Mon compte** : consultation et mise à jour du profil personnel (coordonnées, téléphones, autorité parentale, accompagnement piscine, etc.).
 - **Co-représentant** : association d'un second représentant légal à un enfant (par adresse e-mail).
 
 ### Gestionnaire des inscriptions
 
-#### Liste des inscriptions (`/inscriptions`)
+#### Liste des inscriptions
 
 Tableau récapitulatif de toutes les inscriptions de l'année en cours, avec pour chaque dossier :
 
+- **Statut** : chip « En cours » ou « Clôturé ».
 - **Indicateur de complétion** : barre de progression colorée (vert ≥ 80 %, orange ≥ 50 %, rouge < 50 %) calculée sur 16 critères — informations de l'élève, documents joints, fiche sanitaire, autorisations, charte, et profil des représentants légaux.
-- **Téléchargement du dossier** (icône ↓) : génère et télécharge une archive `.zip` contenant :
-  - `recap.html` — récapitulatif complet et imprimable de l'inscription (identique à la vue détail), avec CSS embarqué, utilisable directement dans un navigateur ou convertible en PDF via l'impression.
-  - `documents/` — tous les fichiers joints au dossier (certificat de naissance, carnet de santé, attestation d'assurance, jugement de divorce le cas échéant, attestation(s) natation des représentants légaux).
+- **Téléchargement du dossier** (icône ↓) : génère une archive `.zip` contenant :
+  - `recap.html` — récapitulatif complet et imprimable.
+  - `documents/` — tous les fichiers joints.
 - **Clic sur une ligne** → vue détail complète du dossier.
 
 #### Vue détail d'un dossier
 
-Accessible en cliquant sur une ligne de la liste. Affiche l'intégralité du dossier organisée en sections :
+Affiche l'intégralité du dossier organisée en sections :
 
 | Section | Contenu |
 |---|---|
@@ -135,9 +191,9 @@ Accessible en cliquant sur une ligne de la liste. Affiche l'intégralité du dos
 | **Documents joints** | Liens vers les fichiers uploadés, ou mention « non fourni » |
 | **Représentants légaux** | Fiche complète de chaque représentant (coordonnées, téléphones, profession, autorité parentale, accompagnement piscine) |
 
-Un bouton **← Retour** permet de revenir à la liste.
+Le bouton **Clôturer / Rouvrir le dossier** (avec confirmation) verrouille ou déverrouille la possibilité pour le représentant légal de modifier le dossier.
 
-#### Gestion des représentants légaux (`/représentants légaux`)
+#### Gestion des représentants légaux
 
 - Liste de tous les comptes représentants légaux avec date de création.
 - Création d'un nouveau compte représentant légal par adresse e-mail.
@@ -153,11 +209,12 @@ Tous les endpoints sont préfixés `/api/`.
 | `POST` | `login/` | — | Authentification |
 | `POST` | `logout/` | Authentifié | Déconnexion |
 | `GET` | `me/` | Authentifié | Profil de l'utilisateur connecté |
-| `GET` | `registrations/` | Gestionnaire | Liste des inscriptions (année en cours) avec complétion |
+| `GET` | `registrations/` | Gestionnaire | Liste des inscriptions (année en cours) avec complétion et statut |
 | `POST` | `registrations/` | Représentant légal | Créer un dossier d'inscription |
-| `GET` | `registrations/<id>/` | Gestionnaire | Détail complet d'un dossier (élève + représentants légaux) |
+| `GET` | `registrations/<id>/` | Gestionnaire / Représentant légal (ses propres dossiers) | Détail complet d'un dossier |
+| `PATCH` | `registrations/<id>/` | Gestionnaire (`is_closed`) / Représentant légal (dossier non clôturé) | Modifier ou clôturer un dossier |
 | `GET` | `registrations/<id>/download/` | Gestionnaire | Télécharger le dossier au format `.zip` |
-| `GET` | `my-registrations/` | Représentant légal | Mes dossiers d'inscription |
+| `GET` | `my-registrations/` | Représentant légal | Mes dossiers (avec complétion et statut de clôture) |
 | `GET` | `legal-representatives/` | Gestionnaire | Liste des représentants légaux |
 | `POST` | `legal-representatives/` | Gestionnaire | Créer un compte représentant légal |
 | `GET` | `co-representative/` | Représentant légal | Co-représentant(s) associé(s) à mes enfants |
@@ -171,6 +228,11 @@ Tous les endpoints sont préfixés `/api/`.
 
 ```
 calcas-dashboard/
+├── Dockerfile                # Image backend (Python + gunicorn)
+├── entrypoint.sh             # migrate + collectstatic + gunicorn
+├── docker-compose.yml        # Orchestration (db, backend, frontend/nginx)
+├── .env.example              # Template des variables d'environnement
+├── requirements.txt          # Dépendances Python
 ├── project/                  # Configuration Django (settings, urls)
 ├── registration/             # Application principale
 │   ├── models.py             # LegalRepresentative, Pupil, RegistrationFile, …
@@ -182,6 +244,8 @@ calcas-dashboard/
 │   ├── urls.py               # Routes
 │   └── html_export.py        # Génération du récapitulatif HTML
 └── apps_js/calcas-dashboard/ # Frontend React
+    ├── Dockerfile            # Build Vite multi-stage → nginx
+    ├── nginx.conf            # Reverse-proxy + serving SPA
     └── src/
         ├── components/       # Composants UI
         ├── store/            # State management Redux
