@@ -17,11 +17,13 @@ import {
     Typography,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { resetRegistration, resetUpdateRegistration } from "../store/registration-slice";
 import { fetchMyRegistrations } from "../store/my-registrations-slice";
 import { fetchRegistrationDetail, clearDetail } from "../store/registration-detail-slice";
 import { RegistrationForm, type DocumentUrls } from "./registration-form";
+import { RegistrationDetailView } from "./registration-detail";
 import type { RegistrationDetail, RegistrationFormInputType } from "../types";
 
 function detailToFormValues(d: RegistrationDetail): Partial<RegistrationFormInputType> {
@@ -73,6 +75,7 @@ export function RegistrationPage() {
 
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [viewingId, setViewingId] = useState<number | null>(null);
 
     useEffect(() => {
         if (fetchStatus === "idle") dispatch(fetchMyRegistrations());
@@ -116,6 +119,17 @@ export function RegistrationPage() {
 
     if (fetchStatus === "failed") {
         return <Alert severity="error">{fetchError ?? "Erreur lors du chargement."}</Alert>;
+    }
+
+    // Read-only detail view (dossier clôturé)
+    if (viewingId !== null) {
+        return (
+            <RegistrationDetailView
+                id={viewingId}
+                onBack={() => setViewingId(null)}
+                readOnly
+            />
+        );
     }
 
     // Edit mode
@@ -218,7 +232,17 @@ export function RegistrationPage() {
                                     )}
                                 </TableCell>
                                 <TableCell align="right">
-                                    {!item.is_closed && (
+                                    {item.is_closed ? (
+                                        <Tooltip title="Consulter le dossier">
+                                            <Button
+                                                size="small"
+                                                startIcon={<VisibilityIcon />}
+                                                onClick={() => setViewingId(item.id)}
+                                            >
+                                                Consulter
+                                            </Button>
+                                        </Tooltip>
+                                    ) : (
                                         <Tooltip title="Modifier le dossier">
                                             <Button
                                                 size="small"

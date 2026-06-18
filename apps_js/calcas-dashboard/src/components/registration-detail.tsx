@@ -186,9 +186,10 @@ function LegalRepresentativeCard({ lr, index }: { lr: LegalRepresentativeDetail;
 interface RegistrationDetailViewProps {
     id: number;
     onBack: () => void;
+    readOnly?: boolean;
 }
 
-export function RegistrationDetailView({ id, onBack }: RegistrationDetailViewProps) {
+export function RegistrationDetailView({ id, onBack, readOnly = false }: RegistrationDetailViewProps) {
     const dispatch = useAppDispatch();
     const { data, status, error, toggleStatus, toggleError } = useAppSelector((s) => s.registrationDetail);
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -238,59 +239,63 @@ export function RegistrationDetailView({ id, onBack }: RegistrationDetailViewPro
                     size="small"
                     variant="outlined"
                 />
-                <Button
-                    variant={data.is_closed ? "outlined" : "contained"}
-                    color={data.is_closed ? "inherit" : "warning"}
-                    size="small"
-                    startIcon={
-                        toggleStatus === "loading"
-                            ? <CircularProgress size={14} color="inherit" />
-                            : data.is_closed
-                                ? <LockOpenIcon fontSize="small" />
-                                : <LockIcon fontSize="small" />
-                    }
-                    disabled={toggleStatus === "loading"}
-                    onClick={handleToggleClose}
-                >
-                    {data.is_closed ? "Rouvrir le dossier" : "Clôturer le dossier"}
-                </Button>
+                {!readOnly && (
+                    <Button
+                        variant={data.is_closed ? "outlined" : "contained"}
+                        color={data.is_closed ? "inherit" : "warning"}
+                        size="small"
+                        startIcon={
+                            toggleStatus === "loading"
+                                ? <CircularProgress size={14} color="inherit" />
+                                : data.is_closed
+                                    ? <LockOpenIcon fontSize="small" />
+                                    : <LockIcon fontSize="small" />
+                        }
+                        disabled={toggleStatus === "loading"}
+                        onClick={handleToggleClose}
+                    >
+                        {data.is_closed ? "Rouvrir le dossier" : "Clôturer le dossier"}
+                    </Button>
+                )}
             </Box>
 
-            {toggleStatus === "failed" && (
+            {!readOnly && toggleStatus === "failed" && (
                 <Alert severity="error" onClose={() => dispatch(resetToggle())} sx={{ mb: 2 }}>
                     {toggleError ?? "Erreur lors de la mise à jour du statut."}
                 </Alert>
             )}
-            {toggleStatus === "succeeded" && (
+            {!readOnly && toggleStatus === "succeeded" && (
                 <Alert severity="success" onClose={() => dispatch(resetToggle())} sx={{ mb: 2 }}>
                     Statut mis à jour.
                 </Alert>
             )}
 
-            {/* Confirmation dialog */}
-            <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-                <DialogTitle>
-                    {data.is_closed ? "Rouvrir le dossier ?" : "Clôturer le dossier ?"}
-                </DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {data.is_closed
-                            ? `Le dossier de ${data.firstname} ${data.lastname} sera rouvert. Le représentant légal pourra de nouveau le modifier.`
-                            : `Le dossier de ${data.firstname} ${data.lastname} sera clôturé. Le représentant légal ne pourra plus le modifier.`}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setConfirmOpen(false)}>Annuler</Button>
-                    <Button
-                        onClick={handleConfirmToggle}
-                        variant="contained"
-                        color={data.is_closed ? "primary" : "warning"}
-                        autoFocus
-                    >
-                        Confirmer
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            {/* Confirmation dialog — supervisor only */}
+            {!readOnly && (
+                <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+                    <DialogTitle>
+                        {data.is_closed ? "Rouvrir le dossier ?" : "Clôturer le dossier ?"}
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            {data.is_closed
+                                ? `Le dossier de ${data.firstname} ${data.lastname} sera rouvert. Le représentant légal pourra de nouveau le modifier.`
+                                : `Le dossier de ${data.firstname} ${data.lastname} sera clôturé. Le représentant légal ne pourra plus le modifier.`}
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setConfirmOpen(false)}>Annuler</Button>
+                        <Button
+                            onClick={handleConfirmToggle}
+                            variant="contained"
+                            color={data.is_closed ? "primary" : "warning"}
+                            autoFocus
+                        >
+                            Confirmer
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            )}
 
             <Stack spacing={3}>
                 {/* ── Informations de l'élève ── */}
