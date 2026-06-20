@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
     Accordion,
     AccordionDetails,
@@ -34,6 +35,8 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { resetRegistration, resetUpdateRegistration, submitRegistration, updateRegistration } from "../store/registration-slice";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const GRADES: { label: string; value: number }[] = [
     { label: "Petite section", value: 1 },
@@ -97,8 +100,21 @@ function FileUploadButton({
     helperText?: string;
     currentUrl?: string | null;
 }) {
+    const [sizeError, setSizeError] = useState<string | null>(null);
+
+    function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file && file.size > MAX_FILE_SIZE) {
+            setSizeError("Le fichier ne doit pas dépasser 5 Mo.");
+            onChange(undefined);
+        } else {
+            setSizeError(null);
+            onChange(file);
+        }
+    }
+
     return (
-        <FormControl error={error}>
+        <FormControl error={error || !!sizeError}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                 <Button variant="outlined" component="label" size="small">
                     {value ? value.name : label}
@@ -106,7 +122,7 @@ function FileUploadButton({
                         type="file"
                         accept={accept ?? "application/pdf,image/*"}
                         hidden
-                        onChange={(e) => onChange(e.target.files?.[0])}
+                        onChange={handleChange}
                     />
                 </Button>
                 {!value && currentUrl && (
@@ -117,7 +133,9 @@ function FileUploadButton({
                     </Typography>
                 )}
             </Stack>
-            {helperText && <FormHelperText>{helperText}</FormHelperText>}
+            {(sizeError || helperText) && (
+                <FormHelperText>{sizeError ?? helperText}</FormHelperText>
+            )}
         </FormControl>
     );
 }

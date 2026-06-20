@@ -12,6 +12,7 @@ import {
     Divider,
     FormControl,
     FormControlLabel,
+    FormHelperText,
     FormLabel,
     Paper,
     Radio,
@@ -41,10 +42,13 @@ import {
 } from "../store/profile-slice";
 import { ProfileFormSchema, type ProfileFormType } from "../types";
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
 // ─── Profile section ──────────────────────────────────────────────────────────
 
 function ProfileSection() {
     const dispatch = useAppDispatch();
+    const [poolSizeError, setPoolSizeError] = useState<string | null>(null);
     const { data, fetchStatus, fetchError, updateStatus, updateError } = useAppSelector(
         (s) => s.profile
     );
@@ -335,7 +339,7 @@ function ProfileSection() {
                         control={control}
                         name="pool_attestation"
                         render={({ field: { onChange, value } }) => (
-                            <FormControl sx={{ mt: 1 }}>
+                            <FormControl error={!!poolSizeError} sx={{ mt: 1 }}>
                                 <Button variant="outlined" component="label" size="small" sx={{ alignSelf: "flex-start" }}>
                                     {value
                                         ? (value as File).name
@@ -346,9 +350,21 @@ function ProfileSection() {
                                         type="file"
                                         accept="application/pdf,image/*"
                                         hidden
-                                        onChange={(e) => onChange(e.target.files?.[0])}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file && file.size > MAX_FILE_SIZE) {
+                                                setPoolSizeError("Le fichier ne doit pas dépasser 5 Mo.");
+                                                onChange(undefined);
+                                            } else {
+                                                setPoolSizeError(null);
+                                                onChange(file);
+                                            }
+                                        }}
                                     />
                                 </Button>
+                                {poolSizeError && (
+                                    <FormHelperText>{poolSizeError}</FormHelperText>
+                                )}
                                 {data?.pool_attestation && (
                                     <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                                         Fichier actuel :{" "}
