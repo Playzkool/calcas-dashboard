@@ -13,8 +13,6 @@ Including another URLconf
     1. Import the include() function: from django.conf.urls import url, include
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
-from django.conf import settings
-from django.conf.urls.static import static
 from django.urls import path, include
 from django.contrib import admin
 
@@ -24,4 +22,7 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     path('admin/', admin.site.urls),
     path('api/', include('rest_api.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+# SÉCURITÉ : /media/ n'est plus servi publiquement (faille d'accès non
+# authentifié aux documents sensibles). Les fichiers transitent désormais
+# uniquement par les endpoints authentifiés de rest_api.media.
