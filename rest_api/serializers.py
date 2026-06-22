@@ -415,9 +415,12 @@ class RegistrationFileUpdateSerializer(serializers.Serializer):
         if pupil_dirty:
             pupil.save()
 
+        changed_fields = []
         for field, value in validated_data.items():
             setattr(instance, field, value)
-        instance.save()
+            changed_fields.append(field)
+        if changed_fields:
+            instance.save(update_fields=changed_fields)
         return instance
 
 

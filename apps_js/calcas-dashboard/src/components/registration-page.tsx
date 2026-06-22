@@ -20,7 +20,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { resetRegistration, resetUpdateRegistration } from "../store/registration-slice";
-import { fetchMyRegistrations } from "../store/my-registrations-slice";
+import { fetchMyRegistrations, resetMyRegistrations } from "../store/my-registrations-slice";
 import { fetchRegistrationDetail, clearDetail } from "../store/registration-detail-slice";
 import { RegistrationForm, type DocumentUrls } from "./registration-form";
 import { RegistrationDetailView } from "./registration-detail";
@@ -86,7 +86,7 @@ export function RegistrationPage() {
         if (registrationStatus === "succeeded") {
             setShowForm(false);
             dispatch(resetRegistration());
-            dispatch(fetchMyRegistrations());
+            dispatch(resetMyRegistrations());
         }
     }, [registrationStatus, dispatch]);
 
