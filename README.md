@@ -46,6 +46,7 @@ docker compose exec backend python manage.py generate_demo_data
 - Python 3.12+
 - Node.js 20+
 - PostgreSQL 16+ (ou Docker pour la BDD uniquement)
+- Redis 7+ (ou Docker — voir astuce ci-dessous)
 
 ### Backend
 
@@ -63,14 +64,15 @@ export POSTGRES_DB=calcas
 export POSTGRES_USER=calcas
 export POSTGRES_PASSWORD=calcas
 export POSTGRES_HOST=localhost
+export REDIS_URL=redis://localhost:6379/0
 
 python manage.py migrate
 python manage.py runserver
 ```
 
-> **Astuce** : lancer uniquement PostgreSQL dans Docker pour le dev local :
+> **Astuce** : lancer PostgreSQL et Redis dans Docker pour le dev local :
 > ```bash
-> docker compose up db
+> docker compose up db redis
 > ```
 
 ### Frontend
@@ -92,6 +94,7 @@ Le fichier `.env` (à créer depuis `.env.example`) est lu par `docker compose`.
 
 | Variable | Description | Exemple |
 |---|---|---|
+| `REDIS_URL` | URL de connexion Redis (cache rate-limiting) | `redis://redis:6379/0` (Docker) / `redis://localhost:6379/0` (local) |
 | `POSTGRES_DB` | Nom de la base | `calcas` |
 | `POSTGRES_USER` | Utilisateur PostgreSQL | `calcas` |
 | `POSTGRES_PASSWORD` | Mot de passe PostgreSQL | chaîne aléatoire |

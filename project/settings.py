@@ -37,7 +37,31 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_ratelimit.middleware.RatelimitMiddleware',
 ]
+
+# Converts Ratelimited exceptions into a 429 response.
+RATELIMIT_VIEW = 'project.views.rate_limited'
+
+# ── Cache (Redis) ─────────────────────────────────────────────────────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/0'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+    }
+}
+
+# ── DRF ──────────────────────────────────────────────────────────────────────
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.AnonRateThrottle'],
+    # Applies only to unauthenticated requests (authenticated users bypass AnonRateThrottle).
+    # NOTE: LocMemCache (default) is per-process — configure a shared cache (Redis/Memcached)
+    # in production with multiple Gunicorn workers so limits are enforced globally.
+    'DEFAULT_THROTTLE_RATES': {'anon': '10/min'},
+}
 
 ROOT_URLCONF = 'project.urls'
 

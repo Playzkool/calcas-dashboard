@@ -9,6 +9,7 @@ import {
     Link,
     Stack,
     TextField,
+    Typography,
 } from "@mui/material";
 import logo from "../assets/logo.png";
 import { useAppDispatch, useAppSelector } from "../hooks";
@@ -60,13 +61,22 @@ export function LoginPage() {
                             >
                                 {status === "loading" ? "Connexion…" : "Se connecter"}
                             </Button>
-                            <Link
-                                href="/accounts/password_reset/"
-                                variant="body2"
-                                sx={{ textAlign: "center" }}
-                            >
-                                Mot de passe oublié ?
-                            </Link>
+                            <Box>
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ mb: 0.5 }}
+                                >
+                                    Première connexion ? Définissez votre mot de passe via le lien ci-dessous.
+                                </Typography>
+                                <Link
+                                    href="/accounts/password_reset/"
+                                    variant="body2"
+                                    sx={{ display: "block", textAlign: "center" }}
+                                >
+                                    Mot de passe oublié ?
+                                </Link>
+                            </Box>
                         </Stack>
                     </form>
                 </CardContent>
