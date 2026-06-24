@@ -8,6 +8,16 @@ from registration.models import LegalRepresentative, Pupil, PupilLegalRepresenta
 from registration.registration_enums import Grade
 
 
+def _api_file_url(request, path: str):
+    """Construit l'URL absolue d'un endpoint de téléchargement authentifié.
+
+    On n'expose plus l'URL brute `/media/...` (servie sans authentification),
+    mais un endpoint `/api/...` qui vérifie les droits avant de servir le
+    fichier (cf. rest_api/media.py).
+    """
+    return request.build_absolute_uri(path) if request else path
+
+
 # ── File-type validators (magic-byte detection) ───────────────────────────────
 
 def _detect_mime(file_obj) -> str | None:
@@ -68,7 +78,7 @@ class LegalRepresentativeDetailSerializer(serializers.ModelSerializer):
         if not obj.pool_attestation:
             return None
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.pool_attestation.url) if request else obj.pool_attestation.url
+        return _api_file_url(request, f"/api/legal-representatives/{obj.id}/pool-attestation/")
 
 
 class RegistrationDetailSerializer(serializers.ModelSerializer):
@@ -127,11 +137,10 @@ class RegistrationDetailSerializer(serializers.ModelSerializer):
         return obj.pupil.get_grade_display()
 
     def _build_url(self, obj, field_name):
-        field_file = getattr(obj, field_name)
-        if not field_file:
+        if not getattr(obj, field_name, None):
             return None
         request = self.context.get("request")
-        return request.build_absolute_uri(field_file.url) if request else field_file.url
+        return _api_file_url(request, f"/api/registrations/{obj.id}/files/{field_name}/")
 
     def get_document_url(self, obj):
         return self._build_url(obj, "document")
@@ -293,7 +302,7 @@ class RegistrationListItemSerializer(serializers.ModelSerializer):
         if not obj.document:
             return None
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.document.url) if request else obj.document.url
+        return _api_file_url(request, f"/api/registrations/{obj.id}/files/document/")
 
     def get_completion_pct(self, obj):
         """
@@ -406,9 +415,12 @@ class RegistrationFileUpdateSerializer(serializers.Serializer):
         if pupil_dirty:
             pupil.save()
 
+        changed_fields = []
         for field, value in validated_data.items():
             setattr(instance, field, value)
-        instance.save()
+            changed_fields.append(field)
+        if changed_fields:
+            instance.save(update_fields=changed_fields)
         return instance
 
 
@@ -470,5 +482,7 @@ class LegalRepresentativeProfileSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         request = self.context.get("request")
         if data.get("pool_attestation") and request:
-            data["pool_attestation"] = request.build_absolute_uri(instance.pool_attestation.url)
+            data["pool_attestation"] = _api_file_url(
+                request, f"/api/legal-representatives/{instance.id}/pool-attestation/"
+            )
         return data

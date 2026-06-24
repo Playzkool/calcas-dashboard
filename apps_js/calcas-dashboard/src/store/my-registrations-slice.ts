@@ -32,7 +32,13 @@ const initialState: MyRegistrationsState = { items: [], status: "idle", error: n
 const myRegistrationsSlice = createSlice({
     name: "myRegistrations",
     initialState,
-    reducers: {},
+    reducers: {
+        resetMyRegistrations(state) {
+            state.status = "idle";
+            state.items = [];
+            state.error = null;
+        },
+    },
     extraReducers: (builder) => {
         builder
             .addCase(fetchMyRegistrations.pending, (state) => { state.status = "loading"; })
@@ -47,4 +53,5 @@ const myRegistrationsSlice = createSlice({
     },
 });
 
+export const { resetMyRegistrations } = myRegistrationsSlice.actions;
 export default myRegistrationsSlice.reducer;

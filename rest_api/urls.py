@@ -12,6 +12,10 @@ from rest_api.views import (
     RegistrationDownloadView,
     RegistrationsView,
 )
+from rest_api.media import (
+    PoolAttestationDownloadView,
+    RegistrationFileDownloadView,
+)
 
 urlpatterns = [
     path("login/", LoginView.as_view()),
@@ -24,4 +28,7 @@ urlpatterns = [
     path("legal-representatives/", LegalRepresentativesView.as_view()),
     path("co-representative/", CoRepresentativeView.as_view()),
     path("my-profile/", MyProfileView.as_view()),
+    # Téléchargement authentifié des fichiers (remplace l'accès public à /media/)
+    path("registrations/<int:pk>/files/<str:field>/", RegistrationFileDownloadView.as_view()),
+    path("legal-representatives/<int:pk>/pool-attestation/", PoolAttestationDownloadView.as_view()),
 ]
