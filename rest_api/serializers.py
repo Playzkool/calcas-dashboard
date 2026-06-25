@@ -1,8 +1,17 @@
+import logging
 import secrets
 from datetime import date
 
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
+
+logger = logging.getLogger(__name__)
 
 from registration.models import LegalRepresentative, Pupil, PupilLegalRepresentative, RegistrationCampaign, RegistrationFile
 from registration.registration_enums import Grade
@@ -433,6 +442,26 @@ class LegalRepresentativeListItemSerializer(serializers.ModelSerializer):
         fields = ["id", "username", "email", "date_creation"]
 
 
+def _send_invitation_email(user: User) -> None:
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    body = render_to_string("registration/invitation_email.html", {
+        "site_url": settings.SITE_URL,
+        "uid": uid,
+        "token": token,
+    })
+    try:
+        send_mail(
+            subject="Votre espace parent — Calandreta Castanet Tolosan",
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("Échec de l'envoi de l'e-mail d'invitation à %s", user.email)
+
+
 class LegalRepresentativeCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
@@ -448,7 +477,9 @@ class LegalRepresentativeCreateSerializer(serializers.Serializer):
             email=email,
             password=secrets.token_urlsafe(32),
         )
-        return LegalRepresentative.objects.create(user=user)
+        lr = LegalRepresentative.objects.create(user=user)
+        _send_invitation_email(user)
+        return lr
 
 
 class LegalRepresentativeProfileSerializer(serializers.ModelSerializer):

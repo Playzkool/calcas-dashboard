@@ -109,6 +109,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # ── Email ─────────────────────────────────────────────────────────────────────
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost').rstrip('/')
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@calcas-dashboard.local')
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
