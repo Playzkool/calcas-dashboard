@@ -4,6 +4,7 @@ import zipfile
 from datetime import date
 
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import PasswordResetForm
 from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from rest_framework import status
@@ -31,6 +32,18 @@ from rest_api.serializers import (
     RegistrationFileUpdateSerializer,
     RegistrationListItemSerializer,
 )
+
+
+def _send_invitation_email(user, request):
+    """Envoie un email d'invitation au nouveau représentant légal avec un lien de définition de mot de passe."""
+    form = PasswordResetForm({"email": user.email})
+    if form.is_valid():
+        form.save(
+            request=request,
+            use_https=request.is_secure(),
+            email_template_name="registration/invitation_email.html",
+            subject_template_name="registration/invitation_subject.txt",
+        )
 
 
 def _get_role(user):
@@ -174,6 +187,7 @@ class CoRepresentativeView(APIView):
         serializer.is_valid(raise_exception=True)
         new_lr = serializer.save()
         PupilLegalRepresentative.objects.create(pupil=pupil, legal_representative=new_lr)
+        _send_invitation_email(new_lr.user, request)
         return Response({"id": new_lr.id}, status=status.HTTP_201_CREATED)
 
 
@@ -336,12 +350,9 @@ class RegistrationDownloadView(APIView):
                 ("vaccination_document", "carnet_sante"),
                 ("insurance_document",   "attestation_assurance"),
                 ("divorce_judgment",     "jugement_divorce"),
-                ("photo",                "photo_identite"),
             ]
-            for n in range(2, 11):
-                doc_slots.append((f"document_{n}", f"autre_document_{n}"))
             for field_name, base_name in doc_slots:
-                file_field = getattr(reg, field_name, None)
+                file_field = getattr(reg, field_name)
                 if not file_field:
                     continue
                 ext = file_field.name.rsplit(".", 1)[-1] if "." in file_field.name else "bin"
