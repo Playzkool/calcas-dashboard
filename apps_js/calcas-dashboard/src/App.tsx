@@ -3,9 +3,11 @@ import { Box, CircularProgress, createTheme, CssBaseline, ThemeProvider } from "
 import { Layout, type Page } from "./components/layout";
 import { LoginPage } from "./components/login-page";
 import { AccountPage } from "./components/account-page";
+import { CguPage } from "./components/cgu-page";
 import { LegalRepresentativesList } from "./components/legal-representatives-list";
 import { RegistrationPage } from "./components/registration-page";
 import { RegistrationsList } from "./components/registrations-list";
+import { RgpdPage } from "./components/rgpd-page";
 import { useAppDispatch, useAppSelector } from "./hooks";
 import { fetchMe, logoutUser } from "./store/auth-slice";
 import type { UserRole } from "./types";
@@ -15,11 +17,12 @@ const ROLE_DEFAULT_PAGE: Record<UserRole, Page> = {
     registration_supervisor: "registrations-list",
 };
 
-const PAGE_COMPONENTS: Record<Page, React.ReactNode> = {
-    registration: <RegistrationPage />,
+const STATIC_PAGE_COMPONENTS: Partial<Record<Page, React.ReactNode>> = {
     account: <AccountPage />,
     "registrations-list": <RegistrationsList />,
     "legal-representatives": <LegalRepresentativesList />,
+    cgu: <CguPage />,
+    rgpd: <RgpdPage />,
 };
 
 function App() {
@@ -57,7 +60,9 @@ function App() {
                 page={page}
                 onNavigate={setPage}
             >
-                {PAGE_COMPONENTS[page]}
+                {page === "registration"
+                    ? <RegistrationPage onNavigate={setPage} />
+                    : STATIC_PAGE_COMPONENTS[page]}
             </Layout>
         );
     }

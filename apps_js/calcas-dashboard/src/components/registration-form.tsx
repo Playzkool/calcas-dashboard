@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
     Accordion,
     AccordionDetails,
@@ -15,6 +15,7 @@ import {
     FormLabel,
     IconButton,
     InputLabel,
+    Link,
     MenuItem,
     Radio,
     RadioGroup,
@@ -35,8 +36,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { resetRegistration, resetUpdateRegistration, submitRegistration, updateRegistration } from "../store/registration-slice";
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+import type { Page } from "./layout";
 
 const GRADES: { label: string; value: number }[] = [
     { label: "Petite section", value: 1 },
@@ -71,34 +71,17 @@ const emptyDefaults = {
 } satisfies Partial<RegistrationFormInputType>;
 
 export interface DocumentUrls {
-    photo?: string | null;
     document?: string | null;
-    document_2?: string | null;
-    document_3?: string | null;
-    document_4?: string | null;
-    document_5?: string | null;
-    document_6?: string | null;
-    document_7?: string | null;
-    document_8?: string | null;
-    document_9?: string | null;
-    document_10?: string | null;
     vaccination_document?: string | null;
     insurance_document?: string | null;
     divorce_judgment?: string | null;
 }
 
-const EXTRA_DOC_FIELDS = [
-    "document_2", "document_3", "document_4", "document_5",
-    "document_6", "document_7", "document_8", "document_9", "document_10",
-] as const;
-type ExtraDocField = typeof EXTRA_DOC_FIELDS[number];
-
-const MAX_DOCUMENTS = 10;
-
 interface RegistrationFormProps {
     registrationId?: number;
     initialData?: Partial<RegistrationFormInputType>;
     documentUrls?: DocumentUrls;
+    onNavigate?: (page: Page) => void;
 }
 
 function FileUploadButton({
@@ -118,77 +101,34 @@ function FileUploadButton({
     helperText?: string;
     currentUrl?: string | null;
 }) {
-    const [sizeError, setSizeError] = useState<string | null>(null);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const isImage = accept === "image/*";
-
-    useEffect(() => {
-        if (!isImage) return;
-        if (!value) { setPreviewUrl(null); return; }
-        const url = URL.createObjectURL(value);
-        setPreviewUrl(url);
-        return () => URL.revokeObjectURL(url);
-    }, [value, isImage]);
-
-    function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0];
-        if (file && file.size > MAX_FILE_SIZE) {
-            setSizeError("Le fichier ne doit pas dépasser 5 Mo.");
-            onChange(undefined);
-        } else {
-            setSizeError(null);
-            onChange(file);
-        }
-    }
-
-    const displayedImage = previewUrl ?? (isImage && !value ? currentUrl : null);
-
     return (
-        <FormControl error={error || !!sizeError}>
-            <Stack spacing={1}>
-                {isImage && displayedImage && (
-                    <Box
-                        component="img"
-                        src={displayedImage}
-                        alt="Aperçu photo d'identité"
-                        sx={{
-                            width: 96,
-                            height: 120,
-                            objectFit: "cover",
-                            borderRadius: 1,
-                            border: "1px solid",
-                            borderColor: "divider",
-                        }}
+        <FormControl error={error}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Button variant="outlined" component="label" size="small">
+                    {value ? value.name : label}
+                    <input
+                        type="file"
+                        accept={accept ?? "application/pdf,image/*"}
+                        hidden
+                        onChange={(e) => onChange(e.target.files?.[0])}
                     />
+                </Button>
+                {!value && currentUrl && (
+                    <Typography variant="caption">
+                        <a href={currentUrl} target="_blank" rel="noreferrer">
+                            Voir le fichier actuel
+                        </a>
+                    </Typography>
                 )}
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                    <Button variant="outlined" component="label" size="small">
-                        {value ? value.name : label}
-                        <input
-                            type="file"
-                            accept={accept ?? "application/pdf,image/jpeg,image/png,image/webp"}
-                            hidden
-                            onChange={handleChange}
-                        />
-                    </Button>
-                    {!isImage && !value && currentUrl && (
-                        <Typography variant="caption">
-                            <a href={currentUrl} target="_blank" rel="noreferrer">
-                                Voir le fichier actuel
-                            </a>
-                        </Typography>
-                    )}
-                </Stack>
             </Stack>
-            {(sizeError || helperText) && (
-                <FormHelperText>{sizeError ?? helperText}</FormHelperText>
-            )}
+            {helperText && <FormHelperText>{helperText}</FormHelperText>}
         </FormControl>
     );
 }
 
-export function RegistrationForm({ registrationId, initialData, documentUrls }: RegistrationFormProps = {}) {
+export function RegistrationForm({ registrationId, initialData, documentUrls, onNavigate }: RegistrationFormProps = {}) {
     const dispatch = useAppDispatch();
+    const [rgpdConsent, setRgpdConsent] = useState(false);
     const createStatus = useAppSelector((state) => state.registration.status);
     const createError = useAppSelector((state) => state.registration.error);
     const updateStatus = useAppSelector((state) => state.registration.updateStatus);
@@ -220,12 +160,6 @@ export function RegistrationForm({ registrationId, initialData, documentUrls }: 
         useFieldArray({ control, name: "authorized_pickup_persons" });
 
     const familySituation = watch("family_situation");
-
-    // Number of "other document" slots visible (1 = only "document", 2 = + document_2, …)
-    const initialSlots = documentUrls
-        ? 1 + EXTRA_DOC_FIELDS.filter((f) => documentUrls[f as ExtraDocField]).length
-        : 1;
-    const [docSlotCount, setDocSlotCount] = useState(Math.max(1, initialSlots));
 
     const onSubmit = (data: RegistrationFormType) => {
         if (isEditMode) {
@@ -382,27 +316,6 @@ export function RegistrationForm({ registrationId, initialData, documentUrls }: 
                                         </FormControl>
                                     )}
                                 />
-
-                                <Box>
-                                    <Typography variant="body2" fontWeight={500} mb={1}>
-                                        Photo d'identité
-                                    </Typography>
-                                    <Controller
-                                        control={control}
-                                        name="photo"
-                                        render={({ field: { onChange, value } }) => (
-                                            <FileUploadButton
-                                                label="Choisir une photo"
-                                                accept="image/jpeg,image/png,image/webp"
-                                                value={value as File | undefined}
-                                                onChange={onChange}
-                                                error={!!errors.photo}
-                                                helperText={errors.photo?.message as string}
-                                                currentUrl={documentUrls?.photo}
-                                            />
-                                        )}
-                                    />
-                                </Box>
                             </Stack>
                         </AccordionDetails>
                     </Accordion>
@@ -471,20 +384,6 @@ export function RegistrationForm({ registrationId, initialData, documentUrls }: 
                                         )}
                                     />
                                 </Stack>
-
-                                <Controller
-                                    control={control}
-                                    name="siblings_names"
-                                    render={({ field }) => (
-                                        <TextField
-                                            label="Prénoms des frères et sœurs (facultatif)"
-                                            fullWidth
-                                            placeholder="Ex : Emma, Lucas…"
-                                            {...field}
-                                            value={field.value ?? ""}
-                                        />
-                                    )}
-                                />
                             </Stack>
                         </AccordionDetails>
                     </Accordion>
@@ -839,13 +738,12 @@ export function RegistrationForm({ registrationId, initialData, documentUrls }: 
                                     />
                                 )}
 
-                                {/* Slot 1 */}
                                 <Controller
                                     control={control}
                                     name="document"
                                     render={({ field: { onChange, value } }) => (
                                         <FileUploadButton
-                                            label="Autre document"
+                                            label="Autre document (facultatif)"
                                             value={value as File | undefined}
                                             onChange={onChange}
                                             error={!!errors.document}
@@ -854,34 +752,6 @@ export function RegistrationForm({ registrationId, initialData, documentUrls }: 
                                         />
                                     )}
                                 />
-
-                                {/* Slots 2–10 */}
-                                {EXTRA_DOC_FIELDS.slice(0, docSlotCount - 1).map((fieldName) => (
-                                    <Controller
-                                        key={fieldName}
-                                        control={control}
-                                        name={fieldName}
-                                        render={({ field: { onChange, value } }) => (
-                                            <FileUploadButton
-                                                label="Autre document"
-                                                value={value as File | undefined}
-                                                onChange={onChange}
-                                                currentUrl={documentUrls?.[fieldName as ExtraDocField]}
-                                            />
-                                        )}
-                                    />
-                                ))}
-
-                                {docSlotCount < MAX_DOCUMENTS && (
-                                    <Button
-                                        size="small"
-                                        startIcon={<AddIcon />}
-                                        onClick={() => setDocSlotCount((n) => n + 1)}
-                                        sx={{ alignSelf: "flex-start" }}
-                                    >
-                                        Ajouter un document
-                                    </Button>
-                                )}
                             </Stack>
                         </AccordionDetails>
                     </Accordion>
@@ -895,9 +765,17 @@ export function RegistrationForm({ registrationId, initialData, documentUrls }: 
                             <Stack spacing={1}>
                                 <Typography variant="body2" color="text.secondary">
                                     En cochant cette case, je déclare avoir lu et compris l'ensemble
-                                    de la Charte des Calandretas ainsi que le règlement intérieur de la
-                                    Calandreta de Castanet Tolosan, et je m'engage à les respecter sur
-                                    la durée totale de scolarisation de mon enfant.
+                                    de la{" "}
+                                    <Link
+                                        href="https://calandreta.org/fr/charte-des-calandretas/"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Charte des Calandretas
+                                    </Link>{" "}
+                                    ainsi que le règlement intérieur de la Calandreta de Castanet
+                                    Tolosan, et je m'engage à les respecter sur la durée totale de
+                                    scolarisation de mon enfant.
                                 </Typography>
                                 <Controller
                                     control={control}
@@ -918,12 +796,37 @@ export function RegistrationForm({ registrationId, initialData, documentUrls }: 
                         </AccordionDetails>
                     </Accordion>
 
+                    {/* ── Consentement RGPD ────────────────────────────────── */}
+                    <FormControlLabel
+                        control={
+                            <Checkbox
+                                checked={rgpdConsent}
+                                onChange={(e) => setRgpdConsent(e.target.checked)}
+                            />
+                        }
+                        label={
+                            <Typography variant="body2">
+                                J'ai lu et j'accepte la{" "}
+                                <Link
+                                    component="button"
+                                    type="button"
+                                    variant="body2"
+                                    onClick={() => onNavigate?.("rgpd")}
+                                >
+                                    politique de protection des données personnelles
+                                </Link>
+                                {" "}et je consens au traitement de mes données dans le cadre de
+                                l'inscription de mon enfant.
+                            </Typography>
+                        }
+                    />
+
                     {/* ── Submit ───────────────────────────────────────────── */}
                     <Button
                         type="submit"
                         variant="contained"
                         size="large"
-                        disabled={status === "loading"}
+                        disabled={status === "loading" || !rgpdConsent}
                         startIcon={
                             status === "loading" ? (
                                 <CircularProgress size={16} color="inherit" />
