@@ -21,10 +21,12 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { resetRegistration, resetUpdateRegistration } from "../store/registration-slice";
 import { fetchMyRegistrations, resetMyRegistrations } from "../store/my-registrations-slice";
+import { resetAccountInfo } from "../store/account-slice";
 import { fetchRegistrationDetail, clearDetail } from "../store/registration-detail-slice";
 import { RegistrationForm, type DocumentUrls } from "./registration-form";
 import { RegistrationDetailView } from "./registration-detail";
 import type { RegistrationDetail, RegistrationFormInputType } from "../types";
+import type { Page } from "./layout";
 
 function detailToFormValues(d: RegistrationDetail): Partial<RegistrationFormInputType> {
     return {
@@ -39,7 +41,6 @@ function detailToFormValues(d: RegistrationDetail): Partial<RegistrationFormInpu
         family_situation: (d.family_situation as RegistrationFormInputType["family_situation"]) ?? undefined,
         siblings_brothers: d.siblings_brothers ?? undefined,
         siblings_sisters: d.siblings_sisters ?? undefined,
-        siblings_names: d.siblings_names ?? undefined,
         other_vaccines: d.other_vaccines ?? undefined,
         diseases_history: d.diseases_history as Record<string, boolean>,
         samu_authorized: d.samu_authorized ?? undefined,
@@ -67,7 +68,11 @@ function CompletionGauge({ value }: { value: number }) {
     );
 }
 
-export function RegistrationPage() {
+interface RegistrationPageProps {
+    onNavigate?: (page: Page) => void;
+}
+
+export function RegistrationPage({ onNavigate }: RegistrationPageProps = {}) {
     const dispatch = useAppDispatch();
     const { items, status: fetchStatus, error: fetchError } = useAppSelector((s) => s.myRegistrations);
     const registrationStatus = useAppSelector((s) => s.registration.status);
@@ -87,6 +92,7 @@ export function RegistrationPage() {
             setShowForm(false);
             dispatch(resetRegistration());
             dispatch(resetMyRegistrations());
+            dispatch(resetAccountInfo());
         }
     }, [registrationStatus, dispatch]);
 
@@ -152,17 +158,7 @@ export function RegistrationPage() {
         }
         if (detailStatus === "succeeded" && detailData) {
             const documentUrls: DocumentUrls = {
-                photo: detailData.photo_url,
                 document: detailData.document_url,
-                document_2: detailData.document_2_url,
-                document_3: detailData.document_3_url,
-                document_4: detailData.document_4_url,
-                document_5: detailData.document_5_url,
-                document_6: detailData.document_6_url,
-                document_7: detailData.document_7_url,
-                document_8: detailData.document_8_url,
-                document_9: detailData.document_9_url,
-                document_10: detailData.document_10_url,
                 vaccination_document: detailData.vaccination_document_url,
                 insurance_document: detailData.insurance_document_url,
                 divorce_judgment: detailData.divorce_judgment_url,
@@ -174,6 +170,7 @@ export function RegistrationPage() {
                         registrationId={editingId}
                         initialData={detailToFormValues(detailData)}
                         documentUrls={documentUrls}
+                        onNavigate={onNavigate}
                     />
                 </Box>
             );
@@ -189,14 +186,14 @@ export function RegistrationPage() {
                         ← Retour
                     </Button>
                 )}
-                <RegistrationForm />
+                <RegistrationForm onNavigate={onNavigate} />
             </Box>
         );
     }
 
     return (
         <Box>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, gap: 2, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
                 <Typography variant="h5">Inscription – année en cours</Typography>
                 <Button variant="contained" onClick={() => setShowForm(true)}>
                     Nouvelle inscription
@@ -208,11 +205,11 @@ export function RegistrationPage() {
                         <TableRow>
                             <TableCell>Prénom</TableCell>
                             <TableCell>Nom</TableCell>
-                            <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Date de naissance</TableCell>
-                            <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Niveau</TableCell>
+                            <TableCell>Date de naissance</TableCell>
+                            <TableCell>Niveau</TableCell>
                             <TableCell>Complétion</TableCell>
                             <TableCell>Statut</TableCell>
-                            <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Document</TableCell>
+                            <TableCell>Document</TableCell>
                             <TableCell />
                         </TableRow>
                     </TableHead>
@@ -221,8 +218,8 @@ export function RegistrationPage() {
                             <TableRow key={item.id}>
                                 <TableCell>{item.firstname}</TableCell>
                                 <TableCell>{item.lastname}</TableCell>
-                                <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{item.birth_date}</TableCell>
-                                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{item.grade_label}</TableCell>
+                                <TableCell>{item.birth_date}</TableCell>
+                                <TableCell>{item.grade_label}</TableCell>
                                 <TableCell>
                                     <CompletionGauge value={item.completion_pct} />
                                 </TableCell>
@@ -233,7 +230,7 @@ export function RegistrationPage() {
                                         <Chip label="En cours" size="small" color="primary" variant="outlined" />
                                     )}
                                 </TableCell>
-                                <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>
+                                <TableCell>
                                     {item.document_url ? (
                                         <a href={item.document_url} target="_blank" rel="noreferrer">
                                             Voir
