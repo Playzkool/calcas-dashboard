@@ -2,6 +2,7 @@ import {
     AppBar,
     Box,
     Button,
+    Divider,
     Drawer,
     IconButton,
     List,
@@ -19,7 +20,7 @@ import logo from "../assets/logo.png";
 
 const DRAWER_WIDTH = 220;
 
-export type Page = "registration" | "registrations-list" | "legal-representatives" | "account";
+export type Page = "registration" | "registrations-list" | "legal-representatives" | "account" | "cgu" | "rgpd";
 
 const NAV_ITEMS: { label: string; page: Page; role: UserRole }[] = [
     { label: "Inscription", page: "registration", role: "legal_representative" },
@@ -45,7 +46,7 @@ export function Layout({ mode, onToggleMode, user, onLogout, page, onNavigate, c
     const drawerContent = (
         <>
             <Toolbar />
-            <List>
+            <List sx={{ flexGrow: 1 }}>
                 {navItems.map(({ label, page: p }) => (
                     <ListItem key={p} disablePadding>
                         <ListItemButton
@@ -56,6 +57,31 @@ export function Layout({ mode, onToggleMode, user, onLogout, page, onNavigate, c
                         </ListItemButton>
                     </ListItem>
                 ))}
+            </List>
+            <Divider />
+            <List dense>
+                <ListItem disablePadding>
+                    <ListItemButton
+                        selected={page === "cgu"}
+                        onClick={() => { onNavigate("cgu"); setMobileOpen(false); }}
+                    >
+                        <ListItemText
+                            primary="CGU"
+                            primaryTypographyProps={{ variant: "caption", color: "text.secondary" }}
+                        />
+                    </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                    <ListItemButton
+                        selected={page === "rgpd"}
+                        onClick={() => { onNavigate("rgpd"); setMobileOpen(false); }}
+                    >
+                        <ListItemText
+                            primary="Données personnelles"
+                            primaryTypographyProps={{ variant: "caption", color: "text.secondary" }}
+                        />
+                    </ListItemButton>
+                </ListItem>
             </List>
         </>
     );
@@ -88,7 +114,7 @@ export function Layout({ mode, onToggleMode, user, onLogout, page, onNavigate, c
                 </Toolbar>
             </AppBar>
 
-            {/* Mobile drawer — temporary overlay */}
+            {/* Drawer mobile — s'ouvre en overlay */}
             <Drawer
                 variant="temporary"
                 open={mobileOpen}
@@ -96,20 +122,20 @@ export function Layout({ mode, onToggleMode, user, onLogout, page, onNavigate, c
                 ModalProps={{ keepMounted: true }}
                 sx={{
                     display: { xs: "block", sm: "none" },
-                    "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
+                    "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box", display: "flex", flexDirection: "column" },
                 }}
             >
                 {drawerContent}
             </Drawer>
 
-            {/* Desktop drawer — permanent sidebar */}
+            {/* Drawer desktop — toujours visible */}
             <Drawer
                 variant="permanent"
                 sx={{
                     display: { xs: "none", sm: "block" },
                     width: DRAWER_WIDTH,
                     flexShrink: 0,
-                    "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
+                    "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box", display: "flex", flexDirection: "column" },
                 }}
                 open
             >
