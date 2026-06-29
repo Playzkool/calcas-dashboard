@@ -1,14 +1,17 @@
 Bonjour,
 
-Un espace parent vient d'être créé pour vous sur la plateforme de gestion des inscriptions de la Calandreta Castanet Tolosan.
+Vous avez été ajouté(e) en tant que co-représentant(e) légal(e) d'un élève
+inscrit à la Calandreta de Castanet Tolosan.
 
-Cliquez sur le lien ci-dessous pour définir votre mot de passe et accéder à votre espace :
+Pour accéder à votre espace famille, vous devez d'abord créer votre mot de passe
+en cliquant sur le lien ci-dessous :
 
-{{ site_url }}/accounts/reset/{{ uid }}/{{ token }}/
+{{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}
 
-Ce lien est valable 3 jours. Passé ce délai, demandez à l'équipe administrative de vous envoyer un nouveau lien.
+Ce lien est valable {{ timeout_days }} jour(s). Passé ce délai, vous pouvez en
+demander un nouveau depuis la page de connexion via "Mot de passe oublié ?".
 
-Si vous pensez avoir reçu cet e-mail par erreur, ignorez-le simplement — aucune action de votre part n'est requise.
-
-— L'équipe Calandreta Castanet Tolosan
-cap.castanet@calandreta.org | 05 62 71 29 67
+---
+Calandreta Castanet Tolosan
+2 avenue Salvador Allende, 31650 Castanet-Tolosan
+cap.castanet@calandreta.org
