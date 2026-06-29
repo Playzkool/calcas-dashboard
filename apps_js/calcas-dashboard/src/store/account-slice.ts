@@ -64,6 +64,10 @@ const accountSlice = createSlice({
             state.createStatus = "idle";
             state.createError = null;
         },
+        resetAccountInfo(state) {
+            state.fetchStatus = "idle";
+            state.pupils = [];
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -85,5 +89,5 @@ const accountSlice = createSlice({
     },
 });
 
-export const { resetCreateStatus } = accountSlice.actions;
+export const { resetCreateStatus, resetAccountInfo } = accountSlice.actions;
 export default accountSlice.reducer;
