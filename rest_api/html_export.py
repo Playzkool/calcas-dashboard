@@ -3,9 +3,7 @@ Generate a printable HTML recap of a registration dossier.
 No external dependencies required.
 """
 
-import base64
 import html
-import mimetypes
 from typing import Optional
 
 from registration.models import LegalRepresentative, PupilLegalRepresentative, RegistrationFile
@@ -58,11 +56,6 @@ h3 { font-size: 13px; font-weight: bold; margin: 14px 0 8px; color: #333; }
 .completion-bar-bg { background: #e9ecef; border-radius: 4px; height: 8px; width: 200px; display: inline-block; vertical-align: middle; margin: 0 8px; }
 .completion-bar-fg { background: #1a56a0; border-radius: 4px; height: 8px; }
 hr { border: none; border-top: 1px solid #eee; margin: 4px 0; }
-.photo-wrap { display: flex; gap: 20px; align-items: flex-start; }
-.photo-wrap .fields { flex: 1; min-width: 0; }
-.id-photo { width: 96px; height: 120px; object-fit: cover; border: 1px solid #ccc; border-radius: 3px; flex-shrink: 0; display: block; }
-.id-photo-placeholder { width: 96px; height: 120px; border: 1px dashed #ccc; border-radius: 3px; display: flex; align-items: center; justify-content: center; background: #f8f8f8; flex-shrink: 0; font-size: 11px; color: #aaa; text-align: center; padding: 8px; }
-.id-photo-label { font-size: 10px; color: #666; text-align: center; margin-top: 4px; text-transform: uppercase; letter-spacing: .3px; }
 @media print {
     body { padding: 0; }
     h2 { break-before: auto; }
@@ -101,21 +94,6 @@ def bool_field(label: str, value: Optional[bool]) -> str:
     )
 
 
-def photo_data_uri(photo_field) -> Optional[str]:
-    """Return a base64 data URI for a FileField, or None if empty."""
-    if not photo_field:
-        return None
-    try:
-        mime, _ = mimetypes.guess_type(photo_field.name)
-        mime = mime or "image/jpeg"
-        photo_field.open("rb")
-        data = base64.b64encode(photo_field.read()).decode()
-        photo_field.close()
-        return f"data:{mime};base64,{data}"
-    except Exception:
-        return None
-
-
 def doc_field(label: str, has_file: bool) -> str:
     if has_file:
         return f'<div class="doc"><span class="ok">✓</span> {html.escape(label)}</div>'
@@ -123,7 +101,8 @@ def doc_field(label: str, has_file: bool) -> str:
         return f'<div class="doc"><span class="missing">✗ {html.escape(label)} — non fourni</span></div>'
 
 
-def generate_registration_html(reg: RegistrationFile, completion_pct: int) -> str:
+def _registration_body(reg: RegistrationFile, completion_pct: int) -> str:
+    """Retourne le contenu HTML d'un dossier sans le wrapper <html>/<body>."""
     pupil = reg.pupil
     plrs = (
         PupilLegalRepresentative.objects
@@ -143,38 +122,23 @@ def generate_registration_html(reg: RegistrationFile, completion_pct: int) -> st
     if pupil.siblings_sisters is not None:
         sibs.append(f"{pupil.siblings_sisters} sœur(s)")
 
-    photo_uri = photo_data_uri(reg.photo)
-    if photo_uri:
-        photo_html = f'<img class="id-photo" src="{photo_uri}" alt="Photo d\'identité">'
-    else:
-        photo_html = '<div class="id-photo-placeholder">Photo non fournie</div>'
-
     section_eleve = f"""
 <h2>Informations de l'élève</h2>
-<div class="photo-wrap">
-  <div class="fields">
-    <div class="grid">
-      {field("Prénom", pupil.firstname)}
-      {field("Nom", pupil.lastname)}
-      {field("Niveau", pupil.get_grade_display())}
-      {field("Date de naissance", pupil.birth_date)}
-      {field("Lieu de naissance", pupil.birth_place)}
-      {field("Nationalité", pupil.nationality)}
-      {field("Code postal", pupil.postal_code)}
-      {field("Adresse", pupil.address)}
-    </div>
-  </div>
-  <div>
-    {photo_html}
-    <div class="id-photo-label">Photo d'identité</div>
-  </div>
+<div class="grid">
+  {field("Prénom", pupil.firstname)}
+  {field("Nom", pupil.lastname)}
+  {field("Niveau", pupil.get_grade_display())}
+  {field("Date de naissance", pupil.birth_date)}
+  {field("Lieu de naissance", pupil.birth_place)}
+  {field("Nationalité", pupil.nationality)}
+  {field("Code postal", pupil.postal_code)}
+  {field("Adresse", pupil.address)}
 </div>
 
 <h2>Situation familiale</h2>
 <div class="grid">
   {field("Situation", fam_sit)}
   {field("Fratrie", ", ".join(sibs) if sibs else None)}
-  {field("Prénoms des frères et sœurs", pupil.siblings_names)}
 </div>
 """
 
@@ -246,19 +210,12 @@ def generate_registration_html(reg: RegistrationFile, completion_pct: int) -> st
 """
 
     # ── Section: Documents ──
-    extra_docs = "".join(
-        doc_field(f"Autre document {n}", bool(getattr(reg, f"document_{n}")))
-        for n in range(2, 11)
-        if getattr(reg, f"document_{n}")
-    )
     section_docs = f"""
 <h2>Documents joints</h2>
 {doc_field("Certificat de naissance / livret de famille", bool(reg.document))}
-{extra_docs}
 {doc_field("Carnet de santé / attestation vaccinale", bool(reg.vaccination_document))}
 {doc_field("Attestation d'assurance", bool(reg.insurance_document))}
 {doc_field("Jugement de divorce / séparation", bool(reg.divorce_judgment))}
-{doc_field("Photo d'identité", bool(reg.photo))}
 """
 
     # ── Section: Représentants légaux ──
@@ -310,16 +267,8 @@ def generate_registration_html(reg: RegistrationFile, completion_pct: int) -> st
 </div>
 """
 
-    # ── Full document ──
     title = html.escape(f"{pupil.firstname} {pupil.lastname} — Dossier d'inscription")
-    return f"""<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>{title}</title>
-  <style>{CSS}</style>
-</head>
-<body>
+    return f"""
   <h1>{title}</h1>
   <div class="subtitle">Niveau : {html.escape(pupil.get_grade_display())}</div>
   {completion_html}
@@ -328,6 +277,39 @@ def generate_registration_html(reg: RegistrationFile, completion_pct: int) -> st
   {section_sanitaire}
   {section_autorisations}
   {section_docs}
-  {section_lr}
+  {section_lr}"""
+
+
+def generate_registration_html(reg: RegistrationFile, completion_pct: int) -> str:
+    """Retourne un document HTML complet pour un seul dossier."""
+    title = html.escape(f"{reg.pupil.firstname} {reg.pupil.lastname} — Dossier d'inscription")
+    body = _registration_body(reg, completion_pct)
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>{title}</title>
+  <style>{CSS}</style>
+</head>
+<body>
+{body}
+</body>
+</html>"""
+
+
+def generate_all_registrations_html(regs_with_completion: list[tuple]) -> str:
+    """Retourne un document HTML unique contenant tous les dossiers, séparés par des sauts de page."""
+    bodies = [_registration_body(reg, pct) for reg, pct in regs_with_completion]
+    separator = '<div style="page-break-after: always; border-top: 2px solid #1a56a0; margin: 40px 0;"></div>'
+    combined = separator.join(bodies)
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Inscriptions – export complet</title>
+  <style>{CSS}</style>
+</head>
+<body>
+{combined}
 </body>
 </html>"""

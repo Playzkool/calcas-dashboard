@@ -1,9 +1,11 @@
+import csv
 import io
 import unicodedata
 import zipfile
 from datetime import date
 
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import PasswordResetForm
 from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from rest_framework import status
@@ -31,6 +33,84 @@ from rest_api.serializers import (
     RegistrationFileUpdateSerializer,
     RegistrationListItemSerializer,
 )
+
+
+EXPORT_HEADERS = [
+    "Prénom", "Nom", "Date de naissance", "Lieu de naissance", "Nationalité",
+    "Code postal", "Adresse", "Niveau", "Situation familiale", "Frères", "Sœurs",
+    "Autorisation SAMU", "Médecin traitant", "Allergies", "Autres vaccins", "Antécédents médicaux",
+    "Autorisation sortie pédagogique", "Droit à l'image", "Charte acceptée",
+    "Pièce naissance/livret", "Carnet santé/vaccins", "Attestation assurance", "Jugement divorce",
+    "Statut dossier",
+    "LR1 Email", "LR1 Prénom", "LR1 Nom", "LR1 Tél mobile", "LR1 Tél fixe", "LR1 Autorité parentale",
+    "LR2 Email", "LR2 Prénom", "LR2 Nom", "LR2 Tél mobile", "LR2 Tél fixe", "LR2 Autorité parentale",
+]
+
+_FAMILY_LABELS = {
+    "married_or_cohabiting": "Marié(e) / En couple",
+    "divorced_or_separated": "Divorcé(e) / Séparé(e)",
+    "single_parent": "Parent seul",
+}
+
+
+def _bool_label(v):
+    if v is True:
+        return "Oui"
+    if v is False:
+        return "Non"
+    return ""
+
+
+def _registration_row(reg):
+    pupil = reg.pupil
+    lrs = [plr.legal_representative for plr in pupil.pupillegalrepresentative_set.all()]
+    diseases = [k for k, v in (reg.diseases_history or {}).items() if v]
+    row = [
+        pupil.firstname or "",
+        pupil.lastname or "",
+        str(pupil.birth_date) if pupil.birth_date else "",
+        pupil.birth_place or "",
+        pupil.nationality or "",
+        pupil.postal_code or "",
+        pupil.address or "",
+        pupil.get_grade_display(),
+        _FAMILY_LABELS.get(pupil.family_situation, pupil.family_situation or ""),
+        str(pupil.siblings_brothers) if pupil.siblings_brothers is not None else "",
+        str(pupil.siblings_sisters) if pupil.siblings_sisters is not None else "",
+        _bool_label(reg.samu_authorized),
+        reg.doctor_name_phone or "",
+        reg.allergies_info or "",
+        reg.other_vaccines or "",
+        ", ".join(diseases),
+        _bool_label(reg.school_trips_authorized),
+        _bool_label(reg.image_rights_authorized),
+        _bool_label(reg.charter_accepted),
+        "Oui" if reg.document else "Non",
+        "Oui" if reg.vaccination_document else "Non",
+        "Oui" if reg.insurance_document else "Non",
+        "Oui" if reg.divorce_judgment else "Non",
+        "Clôturé" if reg.is_closed else "En cours",
+    ]
+    for i in range(2):
+        if i < len(lrs):
+            lr = lrs[i]
+            row += [lr.user.email, lr.firstname or "", lr.lastname or "",
+                    lr.phone_mobile or "", lr.phone_home or "", _bool_label(lr.has_parental_authority)]
+        else:
+            row += ["", "", "", "", "", ""]
+    return row
+
+
+def _send_invitation_email(user, request):
+    """Envoie un email d'invitation au nouveau représentant légal avec un lien de définition de mot de passe."""
+    form = PasswordResetForm({"email": user.email})
+    if form.is_valid():
+        form.save(
+            request=request,
+            use_https=request.is_secure(),
+            email_template_name="registration/invitation_email.html",
+            subject_template_name="registration/invitation_subject.txt",
+        )
 
 
 def _get_role(user):
@@ -174,6 +254,7 @@ class CoRepresentativeView(APIView):
         serializer.is_valid(raise_exception=True)
         new_lr = serializer.save()
         PupilLegalRepresentative.objects.create(pupil=pupil, legal_representative=new_lr)
+        _send_invitation_email(new_lr.user, request)
         return Response({"id": new_lr.id}, status=status.HTTP_201_CREATED)
 
 
@@ -292,6 +373,143 @@ class RegistrationDetailView(APIView):
         return Response({"id": registration.id})
 
 
+class RegistrationsExportView(APIView):
+    """Export de tous les dossiers de l'année en cours — superviseurs uniquement."""
+
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (SessionAuthentication,)
+
+    def get(self, request):
+        if not RegistrationSupervisor.objects.filter(user=request.user).exists():
+            return Response({"detail": "Réservé aux gestionnaires."}, status=status.HTTP_403_FORBIDDEN)
+
+        fmt = request.query_params.get("format", "csv")
+        if fmt not in ("csv", "excel", "odt", "html"):
+            return Response({"detail": "Format invalide. Valeurs acceptées : csv, excel, odt, html."}, status=status.HTTP_400_BAD_REQUEST)
+
+        today = date.today()
+        campaign = RegistrationCampaign.objects.filter(year__year=today.year).first()
+        registrations = (
+            RegistrationFile.objects
+            .filter(campaign=campaign)
+            .select_related("pupil")
+            .prefetch_related("pupil__pupillegalrepresentative_set__legal_representative__user")
+            .order_by("pupil__lastname", "pupil__firstname")
+        ) if campaign else RegistrationFile.objects.none()
+
+        if fmt == "csv":
+            return self._export_csv(registrations)
+        if fmt == "excel":
+            return self._export_excel(registrations)
+        if fmt == "odt":
+            return self._export_odt(registrations)
+        return self._export_html(registrations, request)
+
+    def _export_csv(self, registrations):
+        buf = io.StringIO()
+        writer = csv.writer(buf, dialect="excel")
+        writer.writerow(EXPORT_HEADERS)
+        for reg in registrations:
+            writer.writerow(_registration_row(reg))
+        content = buf.getvalue().encode("utf-8-sig")  # BOM pour compatibilité Excel
+        response = HttpResponse(content, content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="inscriptions.csv"'
+        return response
+
+    def _export_excel(self, registrations):
+        import openpyxl
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Inscriptions"
+        ws.append(EXPORT_HEADERS)
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="1A56A0", end_color="1A56A0", fill_type="solid")
+            cell.alignment = Alignment(wrap_text=True)
+        for reg in registrations:
+            ws.append(_registration_row(reg))
+        for col in ws.columns:
+            width = max((len(str(c.value or "")) for c in col), default=10)
+            ws.column_dimensions[col[0].column_letter].width = min(width + 2, 40)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        response = HttpResponse(
+            buf.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = 'attachment; filename="inscriptions.xlsx"'
+        return response
+
+    def _export_odt(self, registrations):
+        def esc_xml(v):
+            return str(v).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+        def cell(text, is_header=False):
+            style = "Heading" if is_header else "Contents"
+            return (
+                f'<table:table-cell table:style-name="{style}" office:value-type="string">'
+                f'<text:p>{esc_xml(text)}</text:p>'
+                f'</table:table-cell>'
+            )
+
+        rows_xml = "<table:table-row>" + "".join(cell(h, True) for h in EXPORT_HEADERS) + "</table:table-row>"
+        for reg in registrations:
+            rows_xml += "<table:table-row>" + "".join(cell(v) for v in _registration_row(reg)) + "</table:table-row>"
+
+        content_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content
+  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  office:version="1.2">
+<office:automatic-styles>
+  <style:style style:name="Heading" style:family="table-cell">
+    <style:text-properties fo:font-weight="bold" fo:color="#ffffff"/>
+    <style:table-cell-properties fo:background-color="#1a56a0"/>
+  </style:style>
+  <style:style style:name="Contents" style:family="table-cell"/>
+</office:automatic-styles>
+<office:body><office:text>
+  <table:table table:name="Inscriptions">{rows_xml}</table:table>
+</office:text></office:body>
+</office:document-content>"""
+
+        manifest_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+  <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+  <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>"""
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("mimetype", "application/vnd.oasis.opendocument.text", compress_type=zipfile.ZIP_STORED)
+            zf.writestr("META-INF/manifest.xml", manifest_xml)
+            zf.writestr("content.xml", content_xml)
+        buf.seek(0)
+        response = HttpResponse(buf.read(), content_type="application/vnd.oasis.opendocument.text")
+        response["Content-Disposition"] = 'attachment; filename="inscriptions.odt"'
+        return response
+
+    def _export_html(self, registrations, request):
+        from rest_api.html_export import generate_all_registrations_html
+        from rest_api.serializers import RegistrationListItemSerializer
+
+        regs_with_completion = [
+            (reg, RegistrationListItemSerializer(reg, context={"request": request}).data.get("completion_pct", 0))
+            for reg in registrations
+        ]
+        content = generate_all_registrations_html(regs_with_completion)
+        response = HttpResponse(content.encode("utf-8"), content_type="text/html; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="inscriptions.html"'
+        return response
+
+
 def _ascii_filename(name: str) -> str:
     """Normalize a string to ASCII for use in filenames."""
     normalized = unicodedata.normalize("NFKD", name)
@@ -336,12 +554,9 @@ class RegistrationDownloadView(APIView):
                 ("vaccination_document", "carnet_sante"),
                 ("insurance_document",   "attestation_assurance"),
                 ("divorce_judgment",     "jugement_divorce"),
-                ("photo",                "photo_identite"),
             ]
-            for n in range(2, 11):
-                doc_slots.append((f"document_{n}", f"autre_document_{n}"))
             for field_name, base_name in doc_slots:
-                file_field = getattr(reg, field_name, None)
+                file_field = getattr(reg, field_name)
                 if not file_field:
                     continue
                 ext = file_field.name.rsplit(".", 1)[-1] if "." in file_field.name else "bin"
